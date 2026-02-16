@@ -338,7 +338,7 @@ $totalCartItems = 0;
         <div class="w-24 h-24 rounded-full bg-purple-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
             <span class="material-icons-round text-4xl text-purple-500 group-hover:text-white dark:text-purple-300">visibility</span>
         </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">EYES<br>(ตา)</span>
+        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">EYES<br>(อุปกรณ์เสริม)</span>
     </div>
 
     <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">

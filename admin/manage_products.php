@@ -124,13 +124,13 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 <body class="bg-background-light text-text-main overflow-x-hidden">
 <div class="flex min-h-screen w-full">
     
-    <aside class="hidden lg:flex flex-col w-72 h-screen sticky top-0 border-r border-primary/10 bg-white p-6 justify-between z-20">
+    <aside class="hidden lg:flex flex-col w-72 h-screen sticky top-0 border-r border-primary/10 sidebar-gradient p-6 justify-between z-20">
         <div>
             <div class="flex items-center gap-3 px-2 mb-10">
-                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
                     <span class="material-icons-round text-3xl">spa</span>
                 </div>
-                <h1 class="text-2xl font-bold tracking-tight text-primary font-display">Lumina Admin</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-text-main font-display">Lumina Admin</h1>
             </div>
             <nav class="flex flex-col gap-2">
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300" href="dashboard.php">
@@ -291,7 +291,19 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพเพิ่มเติม (Gallery)</label>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพเพิ่มเติม (Gallery)</label>
+                        <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
+                            
+                            <label id="addGalleryBtn" class="aspect-square border-2 border-dashed border-pink-300 rounded-3xl bg-pink-50/50 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-colors text-primary/60">
+                                <span class="material-icons-round text-3xl">add</span>
+                                <span class="text-[10px] font-bold mt-1">เพิ่มรูป</span>
+                                <input type="file" multiple accept="image/*" class="hidden" id="galleryInput">
+                            </label>
+                            
+                            <input type="file" name="gallery_images[]" multiple class="hidden" id="realGalleryInput">
+                        </div>
+                    </div>
                     <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
                         <label class="aspect-square border-2 border-dashed border-gray-300 rounded-2xl bg-white flex items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-colors text-gray-400">
                             <span class="material-icons-round text-2xl">add</span>
