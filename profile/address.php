@@ -258,7 +258,7 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
                     <a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="payment.php">
                         <span class="material-icons-round">credit_card</span><span>วิธีการชำระเงิน</span>
                     </a>
-                    <a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="#">
+                    <a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="history.php">
                         <span class="material-icons-round">history</span><span>ประวัติการสั่งซื้อ</span>
                     </a>
                     <a class="flex items-center space-x-3 px-4 py-3 bg-pink-50 dark:bg-pink-900/20 text-primary font-medium rounded-2xl transition-all shadow-sm" href="address.php">

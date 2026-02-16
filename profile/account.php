@@ -277,7 +277,7 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
     <span class="material-icons-round">credit_card</span>
     <span>วิธีการชำระเงิน</span>
 </a>
-<a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="#">
+<a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="history.php">
 <span class="material-icons-round">history</span>
 <span>ประวัติการสั่งซื้อ</span>
 </a>
@@ -285,7 +285,7 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
 <span class="material-icons-round">location_on</span>
 <span>ที่อยู่จัดส่ง</span>
 </a>
-<a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="#">
+<a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="../shop/favorites.php">
 <span class="material-icons-round">favorite</span>
 <span>สิ่งที่ถูกใจ</span>
 </a>
