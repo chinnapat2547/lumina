@@ -409,23 +409,85 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
     </div>
 </div>
 
-<div id="editAddressModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] hidden flex items-center justify-center opacity-0 transition-opacity duration-300">
-    <div class="bg-white dark:bg-card-dark rounded-3xl p-8 w-full max-w-md shadow-2xl modal-content">
-        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">แก้ไขที่อยู่</h2>
-        <form action="address.php" method="POST" class="space-y-4">
-            <input type="hidden" name="action" value="edit_address">
-            <input type="hidden" name="addr_id" id="edit_addr_id">
-            <input type="text" name="addr_label" id="edit_label" required class="form-input">
-            <input type="text" name="recipient_name" id="edit_name" required class="form-input">
-            <input type="text" name="phone" id="edit_phone" required class="form-input">
-            <input type="text" name="address_line" id="edit_address_line" required class="form-input">
-            <div class="grid grid-cols-2 gap-4">
-                <input type="text" name="district" id="edit_district" required class="form-input">
-                <input type="text" name="province" id="edit_province" required class="form-input">
+<div id="editAddressModal" class="fixed inset-0 z-[60] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity opacity-0 hover:opacity-100"></div>
+
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            
+            <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-gray-100 dark:border-gray-700">
+                
+                <div class="bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span class="material-icons-round text-primary">edit_location_alt</span>
+                        แก้ไขที่อยู่
+                    </h3>
+                    <button type="button" onclick="document.getElementById('editAddressModal').classList.add('hidden')" class="rounded-full p-1 text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all focus:outline-none">
+                        <span class="material-icons-round text-2xl">close</span>
+                    </button>
+                </div>
+
+                <form action="address.php" method="POST" class="px-6 py-6 space-y-5">
+                    <input type="hidden" name="action" value="edit_address">
+                    <input type="hidden" name="addr_id" id="edit_addr_id">
+
+                    <div>
+                        <label for="edit_label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ชื่อสถานที่ (เช่น บ้าน, ที่ทำงาน)</label>
+                        <input type="text" name="addr_label" id="edit_label" placeholder="ระบุชื่อสถานที่" required 
+                            class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100 placeholder-gray-400">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="edit_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ชื่อผู้รับ</label>
+                            <input type="text" name="recipient_name" id="edit_name" required 
+                                class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100">
+                        </div>
+                        <div>
+                            <label for="edit_phone" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">เบอร์โทรศัพท์</label>
+                            <input type="tel" name="phone" id="edit_phone" required 
+                                class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="edit_address_line" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">รายละเอียดที่อยู่</label>
+                        <input type="text" name="address_line" id="edit_address_line" placeholder="บ้านเลขที่, หมู่, ซอย, ถนน" required 
+                            class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100">
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div class="col-span-1">
+                            <label for="edit_district" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">อำเภอ/เขต</label>
+                            <input type="text" name="district" id="edit_district" required 
+                                class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100">
+                        </div>
+                        <div class="col-span-1">
+                            <label for="edit_province" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">จังหวัด</label>
+                            <input type="text" name="province" id="edit_province" required 
+                                class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100">
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="edit_zipcode" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">รหัสไปรษณีย์</label>
+                            <input type="text" name="zipcode" id="edit_zipcode" maxlength="5" required 
+                                class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-gray-800 dark:text-gray-100 text-center tracking-wider">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex gap-3">
+                        <button type="button" onclick="document.getElementById('editAddressModal').classList.add('hidden')" 
+                            class="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
+                            ยกเลิก
+                        </button>
+                        <button type="submit" 
+                            class="flex-[2] px-4 py-3 bg-primary hover:bg-primary-focus text-white font-bold rounded-xl shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all transform active:scale-[0.98]">
+                            บันทึกการเปลี่ยนแปลง
+                        </button>
+                    </div>
+                </form>
             </div>
-            <input type="text" name="zipcode" id="edit_zipcode" maxlength="5" required class="form-input">
-            <button type="submit" class="w-full py-3 bg-primary text-white font-bold rounded-2xl mt-4 transition-all">บันทึกการแก้ไข</button>
-        </form>
+        </div>
     </div>
 </div>
 
