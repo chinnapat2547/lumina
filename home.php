@@ -5,6 +5,7 @@ require_once 'config/connectdbuser.php';
 
 // ตั้งค่าตัวแปรเริ่มต้น (กรณีที่ยังไม่ได้ล็อกอิน)
 $isLoggedIn = false;
+$isAdmin = false;
 $userData = [
     'u_username' => 'ผู้เยี่ยมชม',
     'u_email' => 'กรุณาเข้าสู่ระบบเพื่อใช้งาน'
@@ -12,32 +13,49 @@ $userData = [
 // รูปโปรไฟล์เริ่มต้นสำหรับคนที่ยังไม่ล็อกอิน (สีเทา)
 $profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
 
-// ตรวจสอบว่ามีการล็อกอินและมี Session u_id หรือไม่
-if (isset($_SESSION['u_id'])) {
+// ==========================================
+// 1. ตรวจสอบสถานะการล็อกอิน (Admin หรือ User)
+// ==========================================
+if (isset($_SESSION['admin_id'])) {
+    // 🟢 กรณีที่เป็น Admin
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $admin_id = $_SESSION['admin_id'];
+
+    $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_id` = ?";
+    if ($stmt = mysqli_prepare($conn, $sqlAdmin)) {
+        mysqli_stmt_bind_param($stmt, "i", $admin_id);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        if ($row = mysqli_fetch_assoc($result)) {
+            $userData['u_username'] = $row['admin_username'];
+            $userData['u_email'] = 'Administrator Mode'; // เปลี่ยนอีเมลเป็นคำว่า Admin
+            // ใช้รูปมงกุฎหรือสัญลักษณ์ Admin
+            $profileImage = "https://ui-avatars.com/api/?name=Admin&background=a855f7&color=fff";
+        }
+        mysqli_stmt_close($stmt);
+    }
+} elseif (isset($_SESSION['u_id'])) {
+    // 🔵 กรณีที่เป็น User ธรรมดา
+    $isLoggedIn = true;
     $u_id = $_SESSION['u_id'];
     
-    // 📌 แก้ไข: ใช้ LEFT JOIN เพื่อดึงรูปโปรไฟล์ (u_image) จากตาราง user ด้วย
-    $sql = "SELECT a.*, u.u_image, u.u_gender 
+    $sqlUser = "SELECT a.*, u.u_image, u.u_gender 
             FROM `account` a 
             LEFT JOIN `user` u ON a.u_id = u.u_id 
             WHERE a.u_id = ?";
             
-    if ($stmt = mysqli_prepare($conn, $sql)) {
+    if ($stmt = mysqli_prepare($conn, $sqlUser)) {
         mysqli_stmt_bind_param($stmt, "i", $u_id);
         mysqli_stmt_execute($stmt);
         $result = mysqli_stmt_get_result($stmt);
         if ($row = mysqli_fetch_assoc($result)) {
-            $userData = $row; // นำข้อมูลไปเก็บในตัวแปร
-            $isLoggedIn = true;
+            $userData = $row;
             
             $displayName = $userData['u_username'] ?? 'ผู้ใช้งาน';
-            
-            // 📌 ตรวจสอบและตั้งค่ารูปโปรไฟล์
             if (!empty($userData['u_image']) && file_exists("profile/uploads/" . $userData['u_image'])) {
-                // ถ้าอัปโหลดรูปไว้ ให้ดึงรูปจากโฟลเดอร์ uploads
                 $profileImage = "profile/uploads/" . $userData['u_image'];
             } else {
-                // ถ้ายังไม่อัปโหลดรูป ให้สร้างรูปจากตัวอักษรชื่อแรก
                 $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($displayName) . "&background=F43F85&color=fff";
             }
         }
@@ -45,17 +63,20 @@ if (isset($_SESSION['u_id'])) {
     }
 }
 
+// ตรวจสอบตะกร้าสินค้า (เฉพาะ User เท่านั้น)
 $totalCartItems = 0;
+if (isset($u_id) && !$isAdmin) {
     $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
     if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
         mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
         mysqli_stmt_execute($stmtCartCount);
         $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
         if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
-            $totalCartItems = $rowCartCount['total_qty'] ?? 0; // ถ้าเป็น null ให้เป็น 0
+            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
         }
         mysqli_stmt_close($stmtCartCount);
     }
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -182,26 +203,24 @@ $totalCartItems = 0;
             </button>
 
             <div class="relative group flex items-center">
-                <a href="profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                <a href="<?= $isAdmin ? 'admin/dashboard.php' : 'profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                     <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
                         <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
                     </div>
                 </a>
+                
                 <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
                     <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
                         
                         <div class="text-center mb-4">
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                            <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
                                 <?= $isLoggedIn ? htmlspecialchars($userData['u_email']) : 'กรุณาเข้าสู่ระบบเพื่อใช้งาน' ?>
                             </span>
                         </div>
 
                         <div class="flex justify-center relative mb-4">
-                            <div class="rounded-full p-[3px] bg-primary shadow-md">
+                            <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
                                 <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
-                                    <?php 
-                                        $displayName = $isLoggedIn ? $userData['u_username'] : 'ผ'; 
-                                    ?>
                                     <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
                                 </div>
                             </div>
@@ -212,22 +231,26 @@ $totalCartItems = 0;
                         </div>
 
                         <div class="flex flex-col gap-3 mt-2">
-                            <?php if($isLoggedIn): ?>
+                            <?php if($isAdmin): ?>
+                                <a href="admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                    <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+                                </a>
+                                <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                                </a>
+                            <?php elseif($isLoggedIn): ?>
                                 <a href="profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
                                     จัดการบัญชี
                                 </a>
                                 <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span>
-                                    ออกจากระบบ
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
                                 </a>
                             <?php else: ?>
                                 <a href="auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span>
-                                    เข้าสู่ระบบ
+                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
                                 </a>
                                 <a href="auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span>
-                                    สมัครสมาชิก
+                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
                                 </a>
                             <?php endif; ?>
                         </div>
@@ -281,7 +304,7 @@ $totalCartItems = 0;
 </div>
 </div>
 <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-auto z-20">
-<img alt="Premium Cosmetic Products" class="rounded-3xl shadow-2xl rotate-3 border-4 border-white dark:border-gray-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiUxIow-cJJVBQSpQJLtlK5BQyhlGaMGiYG6wfgsvXSvQ7Enasd15x_0pyIy8mAfwKbh9o2ZIO8ddJU1WkfiLhmmnut0QKnJv2jMo7Gz7uyAQXWroAuIuHkg36AY4NKleKmN-26HMInHJdndqAD8TDPt2La1xlQOWveewjbpfwiIWMyEFG_y3EE_PKx_wQx0S2HA_QTrY-7_UVEw76qY1QFGUYr-joqX0LLM2Y3zhVOlQX9Sn_FmYSyVkHqOoUEcDP9_92ZkxbOW7d"/>
+<img alt="Premium Cosmetic Products" class="rounded-3xl shadow-2xl rotate-3 border-4 border-white dark:border-gray-700" src="https://via.placeholder.com/400x500.png?text=Cosmetic+Product"/>
 </div>
 <div class="absolute bottom-20 right-10 animate-bounce" style="animation-duration: 4s;">
 <div class="bg-pink-100 dark:bg-gray-600 w-28 h-20 rounded-full shadow-lg flex items-center justify-center relative opacity-90">
