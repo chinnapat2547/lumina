@@ -448,7 +448,7 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
         <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">บันทึกรูปภาพหรือสแกนเพื่อชำระเงิน</p>
         
         <div class="bg-gray-100 p-4 rounded-2xl inline-block mb-6 shadow-inner">
-            <img src="../uploads/qr.jpeg" alt="PromptPay QR Code" class="w-48 h-48 object-cover rounded-xl" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg'">
+            <img src="qr.JPEG" alt="PromptPay QR Code" class="w-48 h-48 object-cover rounded-xl" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg'">
         </div>
         <div class="mb-4">
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">ชื่อบัญชี</p>
