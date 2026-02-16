@@ -476,9 +476,7 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
                     </div>
 
                     <div class="pt-4 flex gap-3">
-                        <button type="button" onclick="document.getElementById('editAddressModal').classList.add('hidden')" 
-                            class="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
-                            ยกเลิก
+                        <button type="reset" class="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-all">ล้างข้อมูล
                         </button>
                         <button type="submit" 
                             class="flex-[2] px-4 py-3 bg-primary hover:bg-primary-focus text-white font-bold rounded-xl shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all transform active:scale-[0.98]">
