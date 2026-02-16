@@ -36,58 +36,50 @@ if (isset($_SESSION['u_id'])) {
 // ==========================================
 // 2. จัดการตัวกรอง (Filters), ค้นหา และ แบ่งหน้า
 // ==========================================
-// รับค่าจาก URL (GET)
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort_by = isset($_GET['sort']) ? $_GET['sort'] : 'latest';
 $max_price = isset($_GET['max_price']) ? (int)$_GET['max_price'] : 5000;
-$selected_cats = isset($_GET['category']) ? $_GET['category'] : [];
+$selected_cats = isset($_GET['category']) ? $_GET['category'] : []; // อันนี้จะรับเป็น Array ID หมวดหมู่
 
-// การแบ่งหน้า (Pagination)
-$limit = 20; // 5 สินค้า * 4 แถว = 20 ชิ้นต่อหน้า
+$limit = 20; 
 $page = isset($_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
-// สร้าง SQL Query แบบ Dynamic
-$where_clauses = ["1=1"];
+// 🟢 แก้ไขเงื่อนไข WHERE: ให้แสดงเฉพาะสินค้าที่เปิดขาย (status = 1)
+$where_clauses = ["status = 1"];
 $params = [];
 $types = "";
 
-// 2.1 ค้นหาชื่อสินค้า
 if ($search_query !== '') {
-    $where_clauses[] = "p_name LIKE ?";
+    $where_clauses[] = "(p_name LIKE ? OR p_sku LIKE ?)";
     $params[] = "%" . $search_query . "%";
-    $types .= "s";
+    $params[] = "%" . $search_query . "%";
+    $types .= "ss";
 }
 
-// 2.2 กรองช่วงราคา
 if ($max_price > 0 && $max_price < 5000) {
     $where_clauses[] = "p_price <= ?";
     $params[] = $max_price;
     $types .= "d";
 }
 
-// 2.3 กรองหมวดหมู่
+// 🟢 กรองหมวดหมู่: แก้ให้ค้นหาจาก c_id แทน p_category
 if (!empty($selected_cats)) {
     $placeholders = implode(',', array_fill(0, count($selected_cats), '?'));
-    $where_clauses[] = "p_category IN ($placeholders)";
+    $where_clauses[] = "c_id IN ($placeholders)";
     foreach ($selected_cats as $cat) {
-        $params[] = $cat;
-        $types .= "s";
+        $params[] = (int)$cat; // ส่งเป็น Int เพราะ ID เป็นตัวเลข
+        $types .= "i";
     }
 }
 
 $where_sql = implode(" AND ", $where_clauses);
 
-// 2.4 การเรียงลำดับ
-$order_sql = "ORDER BY p_id DESC"; // ค่าเริ่มต้น (ล่าสุด)
-if ($sort_by === 'price_asc') {
-    $order_sql = "ORDER BY p_price ASC";
-} elseif ($sort_by === 'price_desc') {
-    $order_sql = "ORDER BY p_price DESC";
-} elseif ($sort_by === 'popular') {
-    // สมมติว่ามีคอลัมน์ยอดวิว ถ้าไม่มีให้ใช้ ID
-    $order_sql = "ORDER BY p_id ASC"; 
-}
+// เรียงลำดับ
+$order_sql = "ORDER BY p_id DESC";
+if ($sort_by === 'price_asc') $order_sql = "ORDER BY p_price ASC";
+elseif ($sort_by === 'price_desc') $order_sql = "ORDER BY p_price DESC";
+elseif ($sort_by === 'popular') $order_sql = "ORDER BY p_id ASC"; 
 
 // ==========================================
 // 3. ดึงข้อมูลจาก Database
@@ -95,7 +87,7 @@ if ($sort_by === 'price_asc') {
 $total_products = 0;
 $products = [];
 
-// คิวรีที่ 1: นับจำนวนสินค้าทั้งหมด (เพื่อทำ Pagination)
+// คิวรีนับจำนวน
 $sqlCount = "SELECT COUNT(p_id) as total FROM `product` WHERE $where_sql";
 $stmtCount = mysqli_prepare($conn, $sqlCount);
 if ($types) {
@@ -108,8 +100,15 @@ $stmtCount->close();
 
 $total_pages = ceil($total_products / $limit);
 
-// คิวรีที่ 2: ดึงข้อมูลสินค้าตามหน้าที่เลือก (LIMIT & OFFSET)
-$sqlData = "SELECT * FROM `product` WHERE $where_sql $order_sql LIMIT ? OFFSET ?";
+// 🟢 ดึงข้อมูลสินค้า (Join ตาราง category มาเอาชื่อหมวดหมู่ด้วย)
+$sqlData = "
+    SELECT p.*, c.c_name 
+    FROM `product` p 
+    LEFT JOIN `category` c ON p.c_id = c.c_id 
+    WHERE $where_sql 
+    $order_sql 
+    LIMIT ? OFFSET ?
+";
 $stmtData = mysqli_prepare($conn, $sqlData);
 $typesData = $types . "ii";
 $paramsData = $params;
@@ -124,16 +123,25 @@ while ($row = $resultData->fetch_assoc()) {
 $stmtData->close();
 
 $totalCartItems = 0;
+if (isset($u_id)) {
     $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
     if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
         mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
         mysqli_stmt_execute($stmtCartCount);
         $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
         if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
-            $totalCartItems = $rowCartCount['total_qty'] ?? 0; // ถ้าเป็น null ให้เป็น 0
+            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
         }
         mysqli_stmt_close($stmtCartCount);
     }
+}
+
+// 🟢 ดึงรายการหมวดหมู่ทั้งหมดสำหรับทำตัวกรองซ้ายมือ
+$categories_list = [];
+$resCat = mysqli_query($conn, "SELECT * FROM category");
+while($c = mysqli_fetch_assoc($resCat)) { 
+    $categories_list[] = $c; 
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -241,12 +249,9 @@ $totalCartItems = 0;
                 </button>
                 <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">TONERPADS (โทนเนอร์แพด)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">BLUSH (บลัชออน)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">LIPS (ริมฝีปาก)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">SKIN (ผิว)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">EYES (ตา)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">ACCESSORIES (อุปกรณ์เสริม)</a>
+                        <?php foreach($categories_list as $c): ?>
+                            <a href="?category[]=<?= $c['c_id'] ?>" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition"><?= htmlspecialchars($c['c_name']) ?></a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -263,15 +268,15 @@ $totalCartItems = 0;
 
         <div class="flex items-center space-x-3 sm:space-x-5 text-gray-600 dark:text-gray-300">
             <div class="hidden xl:block relative group">
-                <input id="liveSearchInput" oninput="liveSearch(this.value)" class="pl-10 pr-4 py-2 rounded-full border border-pink-200 dark:border-gray-700 bg-input-bg dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm w-48 xl:w-56 transition-all relative z-10" placeholder="ค้นหาสินค้า..." type="text" autocomplete="off"/>
-                <span class="material-icons-round absolute left-3 top-2 text-gray-400 z-10">search</span>
-            <div id="searchResults" class="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-soft border border-pink-100 dark:border-gray-700 overflow-hidden hidden z-50 max-h-[300px] overflow-y-auto">
-                </div>
+                <form action="products.php" method="GET">
+                    <input id="liveSearchInput" name="search" value="<?= htmlspecialchars($search_query) ?>" class="pl-10 pr-4 py-2 rounded-full border border-pink-200 dark:border-gray-700 bg-input-bg dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm w-48 xl:w-56 transition-all relative z-10" placeholder="ค้นหาสินค้า..." type="text" autocomplete="off"/>
+                    <button type="submit" class="material-icons-round absolute left-3 top-2 text-gray-400 z-10">search</button>
+                </form>
             </div>
-            <a href="../shop/favorites.php" class="hover:text-primary transition relative flex items-center">
+            <a href="favorites.php" class="hover:text-primary transition relative flex items-center">
                 <span class="material-icons-round text-2xl">favorite_border</span>
             </a>
-            <a href="../shop/cart.php" class="hover:text-primary transition relative flex items-center">
+            <a href="cart.php" class="hover:text-primary transition relative flex items-center">
                 <span class="material-icons-round text-2xl">shopping_bag</span>
                 <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800">
                     <?= $totalCartItems ?>
@@ -284,7 +289,7 @@ $totalCartItems = 0;
             </button>
 
             <div class="relative group flex items-center">
-                <a href="profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                <a href="../profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                     <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
                         <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
                     </div>
@@ -301,9 +306,6 @@ $totalCartItems = 0;
                         <div class="flex justify-center relative mb-4">
                             <div class="rounded-full p-[3px] bg-primary shadow-md">
                                 <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
-                                    <?php 
-                                        $displayName = $isLoggedIn ? $userData['u_username'] : 'ผ'; 
-                                    ?>
                                     <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
                                 </div>
                             </div>
@@ -319,17 +321,14 @@ $totalCartItems = 0;
                                     จัดการบัญชี
                                 </a>
                                 <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span>
-                                    ออกจากระบบ
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
                                 </a>
                             <?php else: ?>
                                 <a href="../auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span>
-                                    เข้าสู่ระบบ
+                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
                                 </a>
                                 <a href="../auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span>
-                                    สมัครสมาชิก
+                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
                                 </a>
                             <?php endif; ?>
                         </div>
@@ -344,8 +343,6 @@ $totalCartItems = 0;
             </div>
 
     </div>
-</div>
-</nav>
 </header>
 
 <main class="relative z-10 w-full min-h-[calc(100vh-80px)] pb-20">
@@ -388,22 +385,13 @@ $totalCartItems = 0;
                     <div class="mb-8">
                         <h4 class="font-bold text-gray-800 dark:text-gray-200 mb-4 text-sm">หมวดหมู่สินค้า</h4>
                         <ul class="space-y-3">
-                            <?php
-                            $categories = [
-                                'TONERPADS' => 'TONERPADS (โทนเนอร์แพด)', 
-                                'BLUSH' => 'BLUSH (บลัชออน)', 
-                                'LIPS' => 'LIPS (ริมฝีปาก)', 
-                                'SKIN' => 'SKIN (ผิว)', 
-                                'EYES' => 'EYES (ตา)', 
-                                'ACCESSORIES' => 'ACCESSORIES (อุปกรณ์เสริม)'
-                            ];
-                            foreach($categories as $db_val => $display_name): 
-                                $checked = in_array($db_val, $selected_cats) ? 'checked' : '';
+                            <?php foreach($categories_list as $cat): 
+                                $checked = in_array($cat['c_id'], $selected_cats) ? 'checked' : '';
                             ?>
                             <li>
                                 <label class="flex items-center group cursor-pointer">
-                                    <input type="checkbox" value="<?= $db_val ?>" class="cat-checkbox rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 mr-3 w-4 h-4 transition-all" onchange="applyFilters()" <?= $checked ?>>
-                                    <span class="text-gray-600 dark:text-gray-400 group-hover:text-primary transition-colors text-sm"><?= $display_name ?></span>
+                                    <input type="checkbox" value="<?= $cat['c_id'] ?>" class="cat-checkbox rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 mr-3 w-4 h-4 transition-all" onchange="applyFilters()" <?= $checked ?>>
+                                    <span class="text-gray-600 dark:text-gray-400 group-hover:text-primary transition-colors text-sm"><?= htmlspecialchars($cat['c_name']) ?></span>
                                 </label>
                             </li>
                             <?php endforeach; ?>
@@ -429,10 +417,10 @@ $totalCartItems = 0;
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         
                         <?php foreach($products as $p): 
-                            $p_id = $p['p_id'] ?? '';
-                            $p_name = $p['p_name'] ?? 'ชื่อสินค้า';
-                            $p_desc = $p['p_detail'] ?? 'รายละเอียดสินค้า';
-                            $p_price = number_format($p['p_price'] ?? 0);
+                            $p_id = $p['p_id'];
+                            $p_name = htmlspecialchars($p['p_name']);
+                            $p_price = number_format($p['p_price']);
+                            // เช็คว่ามีรูปหลักไหม ถ้าไม่มีให้ใช้ placeholder
                             $p_image = (!empty($p['p_image']) && file_exists("../uploads/products/" . $p['p_image'])) 
                                         ? "../uploads/products/" . $p['p_image'] 
                                         : "https://via.placeholder.com/400x400.png?text=No+Image";
@@ -441,18 +429,23 @@ $totalCartItems = 0;
                                 
                                 <form action="favorites.php" method="POST" class="absolute top-4 right-4 z-10">
                                     <input type="hidden" name="action" value="add_fav">
-                                    <input type="hidden" name="p_id" value="<?= htmlspecialchars($p_id) ?>">
+                                    <input type="hidden" name="p_id" value="<?= $p_id ?>">
                                     <button type="submit" class="text-gray-300 hover:text-primary hover:scale-110 transition-all bg-white/50 dark:bg-black/30 rounded-full p-1 backdrop-blur-sm shadow-sm" title="เพิ่มในสิ่งที่ถูกใจ">
                                         <span class="material-icons-round text-2xl">favorite_border</span>
                                     </button>
                                 </form>
                                 
-                                <a href="productdetail.php?id=<?= htmlspecialchars($p_id) ?>" class="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 relative flex items-center justify-center block cursor-pointer">
-                                    <img alt="<?= htmlspecialchars($p_name) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="<?= htmlspecialchars($p_image) ?>"/>
+                                <a href="productdetail.php?id=<?= $p_id ?>" class="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 relative flex items-center justify-center block cursor-pointer">
+                                    <img alt="<?= $p_name ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="<?= $p_image ?>"/>
+                                    <?php if($p['p_stock'] <= 0): ?>
+                                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-sm">
+                                            <span class="bg-white text-gray-800 font-bold px-4 py-1.5 rounded-full shadow-lg">สินค้าหมด</span>
+                                        </div>
+                                    <?php endif; ?>
                                 </a>
                                 
                                 <div class="flex-1 flex flex-col px-1">
-                                    <h3 class="text-md font-display font-bold text-gray-800 dark:text-white mb-1 leading-tight line-clamp-1" title="<?= htmlspecialchars($p_name) ?>"><?= htmlspecialchars($p_name) ?></h3>
+                                    <h3 class="text-md font-display font-bold text-gray-800 dark:text-white mb-1 leading-tight line-clamp-1" title="<?= $p_name ?>"><?= $p_name ?></h3>
                                     
                                     <div class="flex items-center mb-2">
                                         <span class="material-icons-round text-yellow-400 text-[12px]">star</span>
@@ -468,11 +461,16 @@ $totalCartItems = 0;
                                     
                                     <form action="cart.php" method="POST" class="mt-auto">
                                         <input type="hidden" name="action" value="add">
-                                        <input type="hidden" name="p_id" value="<?= htmlspecialchars($p_id) ?>">
-                                        <button type="submit" class="w-full bg-pink-50 dark:bg-gray-800 text-primary dark:text-pink-400 hover:bg-primary hover:text-white py-2 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1">
-                                            <span class="material-icons-round text-[16px]">shopping_cart</span>
-                                            ใส่ตะกร้า
-                                        </button>
+                                        <input type="hidden" name="p_id" value="<?= $p_id ?>">
+                                        <?php if($p['p_stock'] > 0): ?>
+                                            <button type="submit" class="w-full bg-pink-50 dark:bg-gray-800 text-primary dark:text-pink-400 hover:bg-primary hover:text-white py-2 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1">
+                                                <span class="material-icons-round text-[16px]">shopping_cart</span> ใส่ตะกร้า
+                                            </button>
+                                        <?php else: ?>
+                                            <button disabled class="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-1 cursor-not-allowed">
+                                                <span class="material-icons-round text-[16px]">remove_shopping_cart</span> สินค้าหมด
+                                            </button>
+                                        <?php endif; ?>
                                     </form>
                                 </div>
                             </div>
@@ -534,79 +532,40 @@ $totalCartItems = 0;
 </footer>
 
 <script>
-    // Script สลับ Dark Mode
-    if (localStorage.getItem('theme') === 'dark') {
-        document.documentElement.classList.add('dark');
-    }
+    if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
     function toggleTheme() {
         const htmlEl = document.documentElement;
         htmlEl.classList.toggle('dark');
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
-    // 🟢 Script สำหรับส่งค่าตัวกรองทั้งหมดพร้อมกันผ่าน URL GET
     function applyFilters() {
         const url = new URL(window.location.href);
-        url.searchParams.delete('page'); // เมื่อฟิลเตอร์ใหม่ ให้กลับไปหน้า 1 เสมอ
+        url.searchParams.delete('page');
 
-        // 1. ค้นหา
-        const search = document.getElementById('searchInput').value;
-        if(search) url.searchParams.set('search', search);
+        // อ่านค่า search จากช่อง input ถ้างงว่าทำไมต้องเช็ค 2 รอบ คือป้องกันการพิมพ์ว่างๆ ครับ
+        const searchInput = document.querySelector('input[name="search"]');
+        if(searchInput && searchInput.value) url.searchParams.set('search', searchInput.value);
         else url.searchParams.delete('search');
 
-        // 2. เรียงลำดับ
         const sort = document.getElementById('sortSelect').value;
         if(sort) url.searchParams.set('sort', sort);
 
-        // 3. ช่วงราคา
         const maxPrice = document.getElementById('priceRange').value;
         url.searchParams.set('max_price', maxPrice);
 
-        // 4. หมวดหมู่ (Checkbox)
         url.searchParams.delete('category[]');
         document.querySelectorAll('.cat-checkbox:checked').forEach(cb => {
             url.searchParams.append('category[]', cb.value);
         });
 
-        // รีเฟรชหน้าเว็บพร้อมส่งค่าทั้งหมดไปที่ URL
         window.location.href = url.toString();
     }
 
-    // 🟢 Script สำหรับเปลี่ยนหน้า (Pagination) คงค่า Filter เดิมไว้
     function goToPage(pageNumber) {
         const url = new URL(window.location.href);
         url.searchParams.set('page', pageNumber);
         window.location.href = url.toString();
     }
-
-    // 🟢 ฟังก์ชัน Live Search
-    function liveSearch(query) {
-        const resultBox = document.getElementById('searchResults');
-        
-        // ถ้าช่องค้นหาว่างเปล่า ให้ซ่อนกล่อง
-        if (query.trim().length === 0) {
-            resultBox.classList.add('hidden');
-            resultBox.innerHTML = '';
-            return;
-        }
-
-        // ยิงคำสั่งไปค้นหาใน Database เบื้องหลัง (ไม่รีเฟรชหน้า)
-        fetch('ajax_search.php?q=' + encodeURIComponent(query))
-            .then(response => response.text())
-            .then(data => {
-                resultBox.innerHTML = data;
-                resultBox.classList.remove('hidden'); // แสดงกล่องผลลัพธ์
-            })
-            .catch(error => console.error('Error:', error));
-    }
-
-    // 🟢 ซ่อนกล่องค้นหาเมื่อคลิกที่ว่างๆ (ที่อื่นบนหน้าเว็บ)
-    document.addEventListener('click', function(e) {
-        const searchInput = document.getElementById('liveSearchInput');
-        const searchResults = document.getElementById('searchResults');
-        if (searchInput && searchResults && !searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-    });
 </script>
 </body></html>

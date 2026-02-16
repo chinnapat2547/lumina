@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     mysqli_stmt_bind_param($stmt, "ssidis", $name, $sku, $cat_id, $price, $stock, $detail);
     
     if (mysqli_stmt_execute($stmt)) {
-        $product_id = mysqli_insert_id($conn); // ได้ ID สินค้าที่เพิ่งเพิ่ม
+        $product_id = mysqli_insert_id($conn);
 
         // 1.2 จัดการอัปโหลดรูปหน้าปก (Main Image)
         if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
@@ -84,6 +84,10 @@ $stat_total = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM 
 $stat_out = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock = 0"))['c'];
 $stat_low = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock > 0 AND p_stock <= 10"))['c'];
 
+// จำนวนออเดอร์ใหม่ (โชว์ที่ Sidebar)
+$today = date('Y-m-d');
+$newOrders = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(order_id) as c FROM orders WHERE DATE(created_at) = '$today'"))['c'] ?? 0;
+
 // ดึงสินค้า
 $products = [];
 $resProd = mysqli_query($conn, "SELECT p.*, c.c_name FROM product p LEFT JOIN category c ON p.c_id = c.c_id ORDER BY p.p_id DESC");
@@ -116,7 +120,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(244, 63, 133, 0.1); }
     .nav-item-active { background-color: #F43F85; color: white; box-shadow: 0 4px 12px rgba(244, 63, 133, 0.3); }
     .nav-item:hover:not(.nav-item-active) { background-color: #fce7f3; color: #F43F85; }
-    /* Scrollbar สำหรับกล่องเพิ่มสี */
     .color-scroll::-webkit-scrollbar { width: 4px; }
     .color-scroll::-webkit-scrollbar-thumb { background: #fce7f3; border-radius: 4px; }
 </style>
@@ -124,13 +127,13 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 <body class="bg-background-light text-text-main overflow-x-hidden">
 <div class="flex min-h-screen w-full">
     
-    <aside class="hidden lg:flex flex-col w-72 h-screen sticky top-0 border-r border-primary/10 sidebar-gradient p-6 justify-between z-20">
+    <aside class="hidden lg:flex flex-col w-72 h-screen sticky top-0 border-r border-primary/10 bg-white p-6 justify-between z-20">
         <div>
             <div class="flex items-center gap-3 px-2 mb-10">
-                <div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
+                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                     <span class="material-icons-round text-3xl">spa</span>
                 </div>
-                <h1 class="text-2xl font-bold tracking-tight text-text-main font-display">Lumina Admin</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-primary font-display">Lumina Admin</h1>
             </div>
             <nav class="flex flex-col gap-2">
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300" href="dashboard.php">
@@ -139,33 +142,56 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300" href="#">
                     <span class="material-icons-round">inventory_2</span><span class="font-bold text-sm">จัดการสินค้า</span>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300" href="#">
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300" href="manage_orders.php">
                     <span class="material-icons-round">receipt_long</span><span class="font-medium text-sm">รายการสั่งซื้อ</span>
-                <?php if($newOrders > 0): ?>
+                    <?php if($newOrders > 0): ?>
                         <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full"><?= $newOrders ?></span>
                     <?php endif; ?>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="#">
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300 group hover:pl-6" href="#">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">group</span>
                     <span class="font-medium text-sm">ข้อมูลลูกค้า</span>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="#">
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300 group hover:pl-6" href="#">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">settings</span>
                     <span class="font-medium text-sm">ตั้งค่าระบบ</span>
-                </a>
                 </a>
             </nav>
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col min-w-0">
-        <header class="flex items-center justify-between px-6 py-4 glass-panel sticky top-0 z-10">
-            <div class="hidden md:flex flex-1 max-w-md relative">
-                <span class="material-icons-round absolute left-4 top-2.5 text-gray-400">search</span>
-                <input class="w-full pl-12 pr-4 py-2.5 rounded-full border-none bg-pink-50 text-sm focus:ring-2 focus:ring-primary/30 outline-none" placeholder="ค้นหาสินค้า (ชื่อ, SKU)..." type="text"/>
+        <header class="flex items-center justify-between px-6 py-4 lg:px-10 lg:py-6 glass-panel sticky top-0 z-10 border-b border-white/50">
+            <div class="flex items-center gap-4 lg:hidden">
+                <button class="p-2 text-text-main hover:bg-black/5 rounded-xl">
+                    <span class="material-icons-round">menu</span>
+                </button>
+                <span class="font-bold text-lg text-primary">Lumina</span>
             </div>
-            <div class="flex items-center gap-4 ml-auto">
-                <img src="https://ui-avatars.com/api/?name=Admin&background=F43F85&color=fff" class="w-10 h-10 rounded-full shadow-sm">
+            
+            <div class="hidden md:flex flex-1 max-w-md relative group">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="material-icons-round text-gray-400 group-focus-within:text-primary transition-colors">search</span>
+                </div>
+                <input class="block w-full pl-10 pr-3 py-2.5 rounded-full border-none bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 transition-all outline-none" placeholder="ค้นหาสินค้า (ชื่อ, SKU)..." type="text"/>
+            </div>
+            
+            <div class="flex items-center gap-4 lg:gap-6 ml-auto">
+                <button class="relative p-2.5 rounded-full bg-white text-gray-500 hover:text-primary hover:bg-primary-light transition-colors shadow-sm">
+                    <span class="material-icons-round">notifications</span>
+                    <span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                </button>
+                <div class="flex items-center gap-3 pl-3 pr-1 py-1 rounded-full bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-sm font-bold text-gray-800 leading-tight">Admin Nina</p>
+                        <p class="text-[10px] text-gray-500 font-medium">ผู้ดูแลระบบสูงสุด</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-400 p-0.5">
+                        <div class="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+                            <img alt="Admin" class="w-full h-full object-cover" src="https://ui-avatars.com/api/?name=Admin&background=F43F85&color=fff"/>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -290,34 +316,26 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     </div>
                 </div>
 
-                <div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพเพิ่มเติม (Gallery)</label>
-                        <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
-                            
-                            <label id="addGalleryBtn" class="aspect-square border-2 border-dashed border-pink-300 rounded-3xl bg-pink-50/50 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-colors text-primary/60">
-                                <span class="material-icons-round text-3xl">add</span>
-                                <span class="text-[10px] font-bold mt-1">เพิ่มรูป</span>
-                                <input type="file" multiple accept="image/*" class="hidden" id="galleryInput">
-                            </label>
-                            
-                            <input type="file" name="gallery_images[]" multiple class="hidden" id="realGalleryInput">
-                        </div>
+                <div class="mt-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-gray-500">รูปภาพเพิ่มเติม (Gallery)</label>
+                        <span class="text-[10px] text-primary bg-pink-50 px-2 py-0.5 rounded-full font-bold">อัปโหลดได้ไม่จำกัด</span>
                     </div>
+                    
                     <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
-                        <label class="aspect-square border-2 border-dashed border-gray-300 rounded-2xl bg-white flex items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-colors text-gray-400">
-                            <span class="material-icons-round text-2xl">add</span>
-                            <input type="file" name="gallery_images[]" multiple accept="image/*" class="hidden" onchange="previewGalleryImages(this)">
+                        <label id="addGalleryBtn" class="aspect-square border-2 border-dashed border-pink-300 rounded-2xl bg-pink-50/50 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-all text-primary/60 hover:bg-pink-50">
+                            <span class="material-icons-round text-3xl">add_photo_alternate</span>
+                            <span class="text-[10px] font-bold mt-1">เพิ่มรูป</span>
+                            <input type="file" multiple accept="image/*" class="hidden" id="galleryInput">
                         </label>
-                        </div>
+                        <input type="file" name="gallery_images[]" multiple class="hidden" id="realGalleryInput">
+                    </div>
                 </div>
             </div>
 
             <div class="w-full md:w-3/5 p-8 overflow-y-auto color-scroll">
-                
                 <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><span class="material-icons-round text-primary">description</span> รายละเอียดทั่วไป</h3>
-                
-                <div class="space-y-5">
+                <div class="space-y-5 pb-20">
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ชื่อสินค้า <span class="text-red-500">*</span></label>
                         <input type="text" name="p_name" required placeholder="เช่น เซรั่มหน้าใส Lumina Glow" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all">
@@ -365,15 +383,12 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                 <span class="material-icons-round text-[14px]">add</span> เพิ่มสี
                             </button>
                         </div>
-                        
-                        <div id="colorContainer" class="space-y-2">
-                            </div>
+                        <div id="colorContainer" class="space-y-2"></div>
                     </div>
                 </div>
-
             </div>
             
-            <div class="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 flex justify-end gap-3 rounded-b-[2rem]">
+            <div class="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 flex justify-end gap-3 rounded-b-[2rem] z-10">
                 <button type="button" onclick="closeModal('addProductModal')" class="px-8 py-3 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
                 <button type="submit" class="px-8 py-3 rounded-full bg-primary text-white font-bold hover:bg-pink-600 shadow-lg shadow-primary/30 transition-all transform hover:-translate-y-0.5">บันทึกสินค้า</button>
             </div>
@@ -382,7 +397,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 </div>
 
 <script>
-    // เปิด-ปิด Modal
     function openModal(id) {
         const m = document.getElementById(id);
         m.classList.remove('hidden'); setTimeout(() => { m.classList.remove('opacity-0'); m.querySelector('.modal-content').classList.remove('scale-95'); }, 10);
@@ -393,7 +407,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    // แจ้งเตือน SweetAlert2 ลบสินค้า
     function confirmDelete(id) {
         Swal.fire({
             title: 'ลบสินค้านี้?', text: "ข้อมูลสินค้า รูปภาพ และสี จะถูกลบทิ้งทั้งหมด!", icon: 'warning',
@@ -409,12 +422,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $_SESSION['success_msg'] ?>', confirmButtonColor: '#F43F85', customClass: { popup: 'rounded-3xl' }});
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
-
-    // ----------------------------------------------------
-    // สคริปต์สำหรับ Modal รูปภาพ และ สี
-    // ----------------------------------------------------
     
-    // Preview รูปหลัก
     function previewMainImage(input) {
         if (input.files && input.files[0]) {
             let reader = new FileReader();
@@ -427,31 +435,57 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         }
     }
 
-    // Preview รูป Gallery หลายรูป
-    function previewGalleryImages(input) {
-        const container = document.getElementById('galleryPreviewContainer');
-        // ลบรูป preview เก่า (เก็บปุ่มปุ่ม + ไว้)
-        container.querySelectorAll('.preview-item').forEach(el => el.remove());
-        
-        if (input.files) {
-            Array.from(input.files).forEach(file => {
-                let reader = new FileReader();
-                reader.onload = function(e) {
-                    let div = document.createElement('div');
-                    div.className = 'preview-item aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative';
-                    div.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
-                    // แทรกก่อนปุ่มบวก (ปุ่มบวกอยู่ตัวแรกสุด)
-                    container.insertBefore(div, container.children[1] || null);
-                }
-                reader.readAsDataURL(file);
-            });
-        }
+    let galleryFilesArray = []; 
+    const galleryInput = document.getElementById('galleryInput');
+    const realGalleryInput = document.getElementById('realGalleryInput');
+    const container = document.getElementById('galleryPreviewContainer');
+    const addBtn = document.getElementById('addGalleryBtn');
+
+    if (galleryInput) {
+        galleryInput.addEventListener('change', function() {
+            const files = this.files;
+            if (files.length > 0) {
+                Array.from(files).forEach(file => { galleryFilesArray.push(file); });
+                updateGalleryUI();
+                updateRealInput();
+            }
+            this.value = ''; 
+        });
     }
 
-    // เพิ่มแถวกรอก สีแบบไดนามิก (เลียนแบบรูปที่ 3)
+    function updateGalleryUI() {
+        document.querySelectorAll('.gallery-preview-item').forEach(el => el.remove());
+        galleryFilesArray.forEach((file, index) => {
+            const objectUrl = URL.createObjectURL(file);
+            let div = document.createElement('div');
+            div.className = 'gallery-preview-item aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group';
+            div.innerHTML = `
+                <img src="${objectUrl}" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button type="button" onclick="removeGalleryImage(${index})" class="w-8 h-8 bg-white text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors transform hover:scale-110 shadow-md">
+                        <span class="material-icons-round text-[18px]">delete</span>
+                    </button>
+                </div>
+            `;
+            container.insertBefore(div, addBtn);
+        });
+    }
+
+    function removeGalleryImage(index) {
+        galleryFilesArray.splice(index, 1);
+        updateGalleryUI();
+        updateRealInput();
+    }
+
+    function updateRealInput() {
+        const dataTransfer = new DataTransfer();
+        galleryFilesArray.forEach(file => { dataTransfer.items.add(file); });
+        realGalleryInput.files = dataTransfer.files;
+    }
+
     let colorIndex = 1;
     function addColorRow() {
-        const container = document.getElementById('colorContainer');
+        const colorContainer = document.getElementById('colorContainer');
         const row = document.createElement('div');
         row.className = 'flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-xl shadow-sm animate-fade-in-up';
         row.innerHTML = `
@@ -461,10 +495,9 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <span class="material-icons-round text-[18px]">close</span>
             </button>
         `;
-        container.appendChild(row);
+        colorContainer.appendChild(row);
         colorIndex++;
     }
-    // แอดแถวสีว่างๆ ให้ 1 แถวตอนเปิดหน้า
     document.addEventListener("DOMContentLoaded", addColorRow);
 
 </script>
