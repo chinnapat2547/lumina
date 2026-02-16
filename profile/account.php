@@ -4,34 +4,32 @@ require_once '../config/connectdbuser.php';
 
 // ตรวจสอบ Login
 if (!isset($_SESSION['u_id'])) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
 $u_id = $_SESSION['u_id'];
 
 // ==========================================
-// ส่วนจัดการอัปโหลด (แบบมีแจ้งเตือน Error)
+// ส่วนจัดการอัปโหลด (ใช้ Session + SweetAlert2)
 // ==========================================
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['profile_image'])) {
     
-    // เช็คว่ามีการส่งไฟล์มาไหม
-    if (!isset($_FILES['profile_image']) || $_FILES['profile_image']['error'] == 4) {
-        // ไม่ได้เลือกไฟล์ ไม่ต้องทำอะไร
-    } 
-    // เช็ค Error จากฝั่ง Server (เช่น ไฟล์ใหญ่เกิน)
-    elseif ($_FILES['profile_image']['error'] != 0) {
-        $errorCode = $_FILES['profile_image']['error'];
-        $errorMsg = "เกิดข้อผิดพลาดในการอัปโหลด (รหัส: $errorCode)";
-        
-        if ($errorCode == 1) $errorMsg = "ไฟล์มีขนาดใหญ่เกินกำหนดของ Server (upload_max_filesize)";
-        elseif ($errorCode == 2) $errorMsg = "ไฟล์มีขนาดใหญ่เกินกำหนด (MAX_FILE_SIZE)";
-        
-        echo "<script>alert('$errorMsg'); window.location.href='account.php';</script>";
-        exit();
-    }
-    // ถ้าไม่มี Error เริ่มกระบวนการย้ายไฟล์
-    else {
+    $file = $_FILES['profile_image'];
+
+    // 1. เช็คว่ามี Error จากการอัปโหลดหรือไม่
+    if ($file['error'] != 0) {
+        $errorCode = $file['error'];
+        $msg = "เกิดข้อผิดพลาดในการอัปโหลด (Code: $errorCode)";
+        if ($errorCode == 1 || $errorCode == 2) $msg = "ไฟล์มีขนาดใหญ่เกินไป";
+
+        $_SESSION['swal_alert'] = [
+            'icon' => 'error',
+            'title' => 'อัปโหลดไม่สำเร็จ',
+            'text' => $msg
+        ];
+    } else {
+        // 2. เตรียม Path และตรวจสอบนามสกุล
         $target_dir = __DIR__ . "/uploads/";
         
         // สร้างโฟลเดอร์ถ้าไม่มี
@@ -39,32 +37,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             mkdir($target_dir, 0777, true);
         }
         
-        $file_extension = strtolower(pathinfo($_FILES["profile_image"]["name"], PATHINFO_EXTENSION));
+        $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
         $allowed_types = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         
         if (in_array($file_extension, $allowed_types)) {
             
-            // 1. หาชื่อรูปเก่า
-            $old_image_name = "";
-            $findOldSql = "SELECT u_image FROM `user` WHERE u_id = ?";
-            if ($stmtOld = mysqli_prepare($conn, $findOldSql)) {
-                mysqli_stmt_bind_param($stmtOld, "i", $u_id);
-                mysqli_stmt_execute($stmtOld);
-                mysqli_stmt_bind_result($stmtOld, $old_image_name);
-                mysqli_stmt_fetch($stmtOld);
-                mysqli_stmt_close($stmtOld);
-            }
-
-            // 2. ตั้งชื่อไฟล์ใหม่
+            // ตั้งชื่อไฟล์ใหม่
             $new_filename = "profile_" . $u_id . "_" . time() . "." . $file_extension;
             $target_file = $target_dir . $new_filename;
             
             // 3. ย้ายไฟล์
-            if (move_uploaded_file($_FILES["profile_image"]["tmp_name"], $target_file)) {
+            if (move_uploaded_file($file["tmp_name"], $target_file)) {
                 
                 // ลบรูปเก่า
-                if (!empty($old_image_name) && file_exists($target_dir . $old_image_name)) {
-                    unlink($target_dir . $old_image_name);
+                $findOldSql = "SELECT u_image FROM `user` WHERE u_id = '$u_id'";
+                $resOld = mysqli_query($conn, $findOldSql);
+                if ($rowOld = mysqli_fetch_assoc($resOld)) {
+                    if (!empty($rowOld['u_image']) && file_exists($target_dir . $rowOld['u_image'])) {
+                        unlink($target_dir . $rowOld['u_image']);
+                    }
                 }
 
                 // อัปเดต Database
@@ -72,31 +63,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($updateStmt = mysqli_prepare($conn, $updateSql)) {
                     mysqli_stmt_bind_param($updateStmt, "iss", $u_id, $new_filename, $new_filename);
                     if(mysqli_stmt_execute($updateStmt)){
-                        // สำเร็จ! รีเฟรชหน้า
-                        echo "<script>alert('อัปโหลดรูปสำเร็จ!'); window.location.href='account.php';</script>";
-                        exit();
+                        $_SESSION['swal_alert'] = [
+                            'icon' => 'success',
+                            'title' => 'สำเร็จ!',
+                            'text' => 'เปลี่ยนรูปโปรไฟล์เรียบร้อยแล้ว'
+                        ];
                     } else {
-                        echo "<script>alert('Database Error: บันทึกข้อมูลไม่สำเร็จ'); window.location.href='account.php';</script>";
+                        $_SESSION['swal_alert'] = [
+                            'icon' => 'error',
+                            'title' => 'Database Error',
+                            'text' => 'บันทึกข้อมูลลงฐานข้อมูลไม่สำเร็จ'
+                        ];
                     }
                     mysqli_stmt_close($updateStmt);
                 }
             } else {
-                // เคสที่ย้ายไฟล์ไม่ได้ (มักเป็น Permission)
-                echo "<script>alert('Permission Error: ไม่สามารถเขียนไฟล์ลงโฟลเดอร์ uploads ได้\\nกรุณาเช็ค Permission (chmod 777)'); window.location.href='account.php';</script>";
-                exit();
+                $_SESSION['swal_alert'] = [
+                    'icon' => 'error',
+                    'title' => 'Permission Error',
+                    'text' => 'ไม่สามารถเขียนไฟล์ได้ (กรุณาเช็คโฟลเดอร์ uploads)'
+                ];
             }
         } else {
-            echo "<script>alert('ประเภทไฟล์ไม่ถูกต้อง (ต้องเป็น jpg, png, gif, webp)'); window.location.href='account.php';</script>";
-            exit();
+            $_SESSION['swal_alert'] = [
+                'icon' => 'warning',
+                'title' => 'ไฟล์ไม่ถูกต้อง',
+                'text' => 'อนุญาตเฉพาะไฟล์รูปภาพ (JPG, PNG, GIF, WEBP) เท่านั้น'
+            ];
         }
     }
+
+    // Redirect กลับเพื่อเคลียร์ค่า POST (แก้ปัญหา Refresh แล้วถามซ้ำ)
+    header("Location: account.php");
+    exit();
 }
 
+// ... ส่วนดึงข้อมูลเดิม ...
 $userData = [];
-
-// ค้นหาข้อมูลผู้ใช้
 $sql = "SELECT a.u_username, a.u_email, a.u_name, 
-               u.u_phone, u.u_image, u.u_gender, u.u_birthdate, u.created_at, u.updated_at 
+        u.u_phone, u.u_image, u.u_gender, u.u_birthdate, u.created_at, u.updated_at 
         FROM `account` a 
         LEFT JOIN `user` u ON a.u_id = u.u_id 
         WHERE a.u_id = ?";
@@ -120,48 +125,47 @@ $birthdate = !empty($userData['u_birthdate']) ? date('d/m/Y', strtotime($userDat
 $created_at = !empty($userData['created_at']) ? date('d/m/Y H:i', strtotime($userData['created_at'])) : '-';
 $updated_at = !empty($userData['updated_at']) ? date('d/m/Y H:i', strtotime($userData['updated_at'])) : '-';
 
-// แปลงเพศเป็นภาษาไทย และกำหนดรูปภาพ Hero
+// แปลงเพศและ Hero Image
 $gender = '-';
-
-// สร้างตัวเลขสุ่มเพื่อใช้เป็น Seed ให้รูปเปลี่ยนไปเรื่อยๆ ทุกครั้งที่รีเฟรช (สำหรับคนไม่ระบุเพศ)
 $randomSeed = uniqid(); 
 $heroImage = "https://api.dicebear.com/9.x/notionists/svg?seed=" . $randomSeed . "&backgroundColor=transparent";
 
 if (!empty($userData['u_gender'])) {
     if ($userData['u_gender'] == 'Male') {
         $gender = 'ชาย';
-        // ผู้ชาย บังคับใช้ seed=Easton
         $heroImage = "https://api.dicebear.com/9.x/notionists/svg?seed=Easton&backgroundColor=transparent";
     } elseif ($userData['u_gender'] == 'Female') {
         $gender = 'หญิง';
-        // ผู้หญิง บังคับใช้ seed=Ryan
         $heroImage = "https://api.dicebear.com/9.x/notionists/svg?seed=Ryan&backgroundColor=transparent";
     } else {
         $gender = 'อื่นๆ';
-        // เพศอื่นๆ ใช้รูปสุ่มเปลี่ยนทุกครั้งที่รีเฟรช
         $heroImage = "https://api.dicebear.com/9.x/notionists/svg?seed=" . $randomSeed . "&backgroundColor=transparent";
     }
 }
 
-// ตรวจสอบรูปโปรไฟล์ (รูปเล็ก)
+// ==========================================
+// [แก้] จัดการ Path รูปโปรไฟล์ให้จบที่ PHP
+// ==========================================
+// เริ่มต้นด้วยรูป Default
 $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($displayName) . "&background=F43F85&color=fff&size=150";
 
-// [แก้จุดที่ 2] ใช้ __DIR__ เช็คไฟล์จริง แต่ตัวแปร $profileImage ยังคงเป็น Relative Path เพื่อให้ Browser แสดงผลได้
+// เช็คว่ามีรูปใน DB และไฟล์มีอยู่จริงไหม
 if (!empty($userData['u_image']) && file_exists(__DIR__ . "/uploads/" . $userData['u_image'])) {
-    $profileImage = "/uploads/" . $userData['u_image'];
+    // ถ้ามี ให้ใช้ Path เต็มที่ชี้ไปยังโฟลเดอร์ uploads ของ Server
+    $profileImage = "/lumina/profile/uploads/" . $userData['u_image'];
 }
 
 $totalCartItems = 0;
-    $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
-    if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
-        mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
-        mysqli_stmt_execute($stmtCartCount);
-        $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
-        if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
-            $totalCartItems = $rowCartCount['total_qty'] ?? 0; // ถ้าเป็น null ให้เป็น 0
-        }
-        mysqli_stmt_close($stmtCartCount);
+$sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
+if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
+    mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
+    mysqli_stmt_execute($stmtCartCount);
+    $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
+    if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
+        $totalCartItems = $rowCartCount['total_qty'] ?? 0;
     }
+    mysqli_stmt_close($stmtCartCount);
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -169,6 +173,7 @@ $totalCartItems = 0;
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Lumina Beauty - หน้าจัดการบัญชี</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
 <script>
@@ -329,7 +334,7 @@ $totalCartItems = 0;
             </div>
         </div>
         <input type="file" id="profileImageInput" name="profile_image" accept="image/*" class="hidden" onchange="document.getElementById('imageUploadForm').submit();">
-        <button type="button" onclick="document.getElementById('profileImageInput').click();" class="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition transform translate-y-2 group-hover:translate-y-0 hover:scale-110 border-2 border-white dark:border-card-dark">
+        <button type="button" onclick="document.getElementById('profileImageInput').click();" class="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition transform translate-y-2 group-hover:translate-y-0 hover:scale-110 border-2 border-white dark:border-card-dark cursor-pointer">
             <span class="material-icons-round text-sm">camera_alt</span>
         </button>
     </form>
@@ -420,4 +425,22 @@ $totalCartItems = 0;
         }
     }
 </script>
+
+<?php if (isset($_SESSION['swal_alert'])): ?>
+<script>
+    Swal.fire({
+        icon: '<?= $_SESSION['swal_alert']['icon'] ?>',
+        title: '<?= $_SESSION['swal_alert']['title'] ?>',
+        text: '<?= $_SESSION['swal_alert']['text'] ?>',
+        confirmButtonColor: '#F43F85',
+        confirmButtonText: 'ตกลง',
+        timer: 3000,
+        timerProgressBar: true
+    });
+</script>
+<?php 
+    unset($_SESSION['swal_alert']); 
+?>
+<?php endif; ?>
+
 </body></html>
