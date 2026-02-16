@@ -1,571 +1,487 @@
 <?php
 session_start();
-require_once '../config/connectdbuser.php';
+$alertType = "";
+$alertMsg = "";
 
-// ==========================================
-// 1. จัดการข้อมูลผู้ใช้สำหรับแสดงบน Navbar
-// ==========================================
-$isLoggedIn = false;
-$profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
-$userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once '../config/connectdbuser.php';
 
-if (isset($_SESSION['u_id'])) {
-    $isLoggedIn = true;
-    $u_id = $_SESSION['u_id'];
-    
-    $sqlUser = "SELECT a.u_username, a.u_email, u.u_image 
-            FROM `account` a 
-            LEFT JOIN `user` u ON a.u_id = u.u_id 
-            WHERE a.u_id = ?";
-    if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
-        mysqli_stmt_bind_param($stmtUser, "i", $u_id);
-        mysqli_stmt_execute($stmtUser);
-        $resultUser = mysqli_stmt_get_result($stmtUser);
-        if ($rowUser = mysqli_fetch_assoc($resultUser)) {
-            $userData = $rowUser;
-            if (!empty($userData['u_image']) && file_exists("../profile/uploads/" . $userData['u_image'])) {
-                $profileImage = "../profile/uploads/" . $userData['u_image'];
+    // เปลี่ยนมารับค่าเป็นตัวแปร login_id (เป็นไปได้ทั้งอีเมลและชื่อผู้ใช้)
+    $login_id = $_POST['login_id'];
+    $password = $_POST['password'];
+
+    // 1. ค้นหาผู้ใช้จาก อีเมล หรือ ชื่อผู้ใช้ ในฐานข้อมูล account (User ปกติ)
+    $sql = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
+    if ($stmt = mysqli_prepare($conn, $sql)) {
+        // นำ $login_id ไปตรวจสอบทั้ง 2 เงื่อนไข
+        mysqli_stmt_bind_param($stmt, "ss", $login_id, $login_id);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+
+        // หากพบผู้ใช้นี้ในระบบ (เป็น User)
+        if (mysqli_num_rows($result) === 1) {
+            $row = mysqli_fetch_assoc($result);
+            
+            // ตรวจสอบรหัสผ่าน
+            if (password_verify($password, $row['u_password']) || $password === $row['u_password']) {
+                // สร้าง Session เก็บข้อมูลผู้ใช้
+                $_SESSION['u_id'] = $row['u_id'];
+                $_SESSION['u_username'] = $row['u_username'];
+                $_SESSION['u_name'] = $row['u_name'];
+                
+                $alertType = "success";
+                $alertMsg = "เข้าสู่ระบบสำเร็จ!";
             } else {
-                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=F43F85&color=fff";
+                $alertType = "error";
+                $alertMsg = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+            }
+        } else {
+            // 2. หากไม่พบใน account ให้มาค้นหาในตาราง adminaccount ต่อ (เป็น Admin)
+            $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
+            if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
+                mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
+                mysqli_stmt_execute($stmtAdmin);
+                $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
+
+                if (mysqli_num_rows($resultAdmin) === 1) {
+                    $rowAdmin = mysqli_fetch_assoc($resultAdmin);
+                    
+                    // ตรวจสอบรหัสผ่าน Admin
+                    if (password_verify($password, $rowAdmin['admin_password']) || $password === $rowAdmin['admin_password']) {
+                        // สร้าง Session เก็บข้อมูลแอดมิน
+                        $_SESSION['admin_id'] = $rowAdmin['admin_id'];
+                        $_SESSION['admin_username'] = $rowAdmin['admin_username'];
+                        
+                        $alertType = "success";
+                        $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
+                    } else {
+                        $alertType = "error";
+                        $alertMsg = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+                    }
+                } else {
+                    // หากไม่พบทั้ง 2 ตาราง
+                    $alertType = "error";
+                    $alertMsg = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
+                }
+                mysqli_stmt_close($stmtAdmin);
             }
         }
-        mysqli_stmt_close($stmtUser);
+        mysqli_stmt_close($stmt);
+    } else {
+        $alertType = "error";
+        $alertMsg = "เกิดข้อผิดพลาดในการตรวจสอบข้อมูล: " . mysqli_error($conn);
     }
-}
-
-// ==========================================
-// 2. จัดการตัวกรอง (Filters), ค้นหา และ แบ่งหน้า
-// ==========================================
-$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
-$sort_by = isset($_GET['sort']) ? $_GET['sort'] : 'latest';
-$max_price = isset($_GET['max_price']) ? (int)$_GET['max_price'] : 5000;
-$selected_cats = isset($_GET['category']) ? $_GET['category'] : []; // อันนี้จะรับเป็น Array ID หมวดหมู่
-
-$limit = 20; 
-$page = isset($_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
-$offset = ($page - 1) * $limit;
-
-// 🟢 แก้ไขเงื่อนไข WHERE: ให้แสดงเฉพาะสินค้าที่เปิดขาย (status = 1)
-$where_clauses = ["status = 1"];
-$params = [];
-$types = "";
-
-if ($search_query !== '') {
-    $where_clauses[] = "(p_name LIKE ? OR p_sku LIKE ?)";
-    $params[] = "%" . $search_query . "%";
-    $params[] = "%" . $search_query . "%";
-    $types .= "ss";
-}
-
-if ($max_price > 0 && $max_price < 5000) {
-    $where_clauses[] = "p_price <= ?";
-    $params[] = $max_price;
-    $types .= "d";
-}
-
-// 🟢 กรองหมวดหมู่: แก้ให้ค้นหาจาก c_id แทน p_category
-if (!empty($selected_cats)) {
-    $placeholders = implode(',', array_fill(0, count($selected_cats), '?'));
-    $where_clauses[] = "c_id IN ($placeholders)";
-    foreach ($selected_cats as $cat) {
-        $params[] = (int)$cat; // ส่งเป็น Int เพราะ ID เป็นตัวเลข
-        $types .= "i";
-    }
-}
-
-$where_sql = implode(" AND ", $where_clauses);
-
-// เรียงลำดับ
-$order_sql = "ORDER BY p_id DESC";
-if ($sort_by === 'price_asc') $order_sql = "ORDER BY p_price ASC";
-elseif ($sort_by === 'price_desc') $order_sql = "ORDER BY p_price DESC";
-elseif ($sort_by === 'popular') $order_sql = "ORDER BY p_id ASC"; 
-
-// ==========================================
-// 3. ดึงข้อมูลจาก Database
-// ==========================================
-$total_products = 0;
-$products = [];
-
-// คิวรีนับจำนวน
-$sqlCount = "SELECT COUNT(p_id) as total FROM `product` WHERE $where_sql";
-$stmtCount = mysqli_prepare($conn, $sqlCount);
-if ($types) {
-    $stmtCount->bind_param($types, ...$params);
-}
-$stmtCount->execute();
-$resultCount = $stmtCount->get_result();
-$total_products = $resultCount->fetch_assoc()['total'];
-$stmtCount->close();
-
-$total_pages = ceil($total_products / $limit);
-
-// 🟢 ดึงข้อมูลสินค้า (Join ตาราง category มาเอาชื่อหมวดหมู่ด้วย)
-$sqlData = "
-    SELECT p.*, c.c_name 
-    FROM `product` p 
-    LEFT JOIN `category` c ON p.c_id = c.c_id 
-    WHERE $where_sql 
-    $order_sql 
-    LIMIT ? OFFSET ?
-";
-$stmtData = mysqli_prepare($conn, $sqlData);
-$typesData = $types . "ii";
-$paramsData = $params;
-$paramsData[] = $limit;
-$paramsData[] = $offset;
-$stmtData->bind_param($typesData, ...$paramsData);
-$stmtData->execute();
-$resultData = $stmtData->get_result();
-while ($row = $resultData->fetch_assoc()) {
-    $products[] = $row;
-}
-$stmtData->close();
-
-$totalCartItems = 0;
-if (isset($u_id)) {
-    $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
-    if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
-        mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
-        mysqli_stmt_execute($stmtCartCount);
-        $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
-        if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
-            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
-        }
-        mysqli_stmt_close($stmtCartCount);
-    }
-}
-
-// 🟢 ดึงรายการหมวดหมู่ทั้งหมดสำหรับทำตัวกรองซ้ายมือ
-$categories_list = [];
-$resCat = mysqli_query($conn, "SELECT * FROM category");
-while($c = mysqli_fetch_assoc($resCat)) { 
-    $categories_list[] = $c; 
+    mysqli_close($conn);
 }
 ?>
 <!DOCTYPE html>
-<html lang="th"><head>
+<html class="light" lang="th">
+<head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>สินค้าทั้งหมด - Lumina Beauty</title>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<title>เข้าสู่ระบบ LuminaBeauty</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script>
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              primary: "#F43F85",
-              secondary: "#FBCFE8",
-              accent: "#A78BFA",
-              "background-light": "#FFF5F7",
-              "background-dark": "#1F1B24",
-              "surface-light": "#FFFFFF",
-              "surface-dark": "#2D2635",
-              "text-light": "#374151",
-              "text-dark": "#E5E7EB",
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+</script>
+
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ee2b8c",
+                        "background-light": "#fcf8fa",
+                        "background-dark": "#221019",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#2d1622",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                    animation: {
+                        'blink': 'blink 4s infinite',
+                    },
+                    keyframes: {
+                        blink: {
+                            '0%, 45%, 55%, 100%': { transform: 'scaleY(1)' },
+                            '50%': { transform: 'scaleY(0.1)' },
+                        }
+                    }
+                },
             },
-            fontFamily: {
-              display: ["Prompt", "sans-serif"],
-              body: ["Prompt", "sans-serif"],
-            },
-            borderRadius: {
-              DEFAULT: "1rem",
-              'xl': "1.5rem",
-              '2xl': "2rem",
-              '3xl': "3rem",
-            },
-            boxShadow: {
-              'soft': '0 10px 40px -10px rgba(244, 63, 133, 0.15)',
-              'glow': '0 0 20px rgba(244, 63, 133, 0.3)',
-            }
-          },
-        },
-      };
+        }
     </script>
 <style>
-        body { font-family: 'Prompt', sans-serif; }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        .dark .glass-panel {
-            background: rgba(45, 38, 53, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            background: transparent;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 20px; width: 20px; border-radius: 50%;
-            background: #F43F85; cursor: pointer; margin-top: -8px;
-            box-shadow: 0 0 10px rgba(244, 63, 133, 0.4);
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; cursor: pointer;
-            background: #FBCFE8; border-radius: 2px;
-        }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #FBCFE8; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #F43F85; }
+        ::-webkit-scrollbar-thumb { background-color: #e7cfdb; border-radius: 20px; }
+        .cloud-body {
+            box-shadow: 
+                inset -10px -10px 30px rgba(0,0,0,0.1),
+                inset 10px 10px 30px rgba(255,255,255,0.8),
+                20px 20px 60px rgba(0,0,0,0.1);
+        }
+        .parallax-item { transition: transform 0.1s ease-out; will-change: transform; }
+
+        .gradient-border-box {
+            position: relative;
+            border-radius: 24px;
+            background: transparent;
+            z-index: 0;
+        }
+        
+        .gradient-border-box::before {
+            content: "";
+            position: absolute;
+            inset: -3px;
+            border-radius: 38px; 
+            padding: 4px; 
+            background: linear-gradient(45deg, #ffecd2, #fcb69f, #e0c3fc, #ffecd2, #fcb69f); 
+            background-size: 400% 400%;
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: moveBorderGradient 6s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes moveBorderGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .corner-decor {
+            position: absolute;
+            font-size: 24px;
+            opacity: 0.6;
+            animation: sparkle 3s ease-in-out infinite;
+        }
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+        
+        .eye-pupil { transition: transform 0.05s ease-out; }
     </style>
 </head>
-<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark transition-colors duration-300 min-h-screen relative overflow-x-hidden">
+<body class="bg-background-light dark:bg-background-dark font-display text-[#1b0d14] dark:text-[#f3e7ed] antialiased min-h-screen flex flex-col">
+<div class="flex min-h-screen w-full flex-row overflow-hidden">
+    
+<div id="visual-container" class="hidden lg:flex w-1/2 relative bg-gradient-to-br from-[#ffecd2] via-[#fcb69f] to-[#e0c3fc] items-center justify-center overflow-hidden">
+    
+    <div class="parallax-item absolute top-20 left-20 text-white/40" data-speed="0.02">
+        <span class="material-symbols-outlined text-6xl">auto_awesome</span>
+    </div>
+    <div class="parallax-item absolute bottom-32 right-20 text-white/30" data-speed="0.03">
+        <span class="material-symbols-outlined text-5xl">favorite</span>
+    </div>
 
-<div class="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-    <div class="absolute top-[10%] left-[10%] w-[40%] h-[40%] rounded-full bg-pink-200 dark:bg-pink-900 blur-[100px] opacity-40 animate-pulse"></div>
-    <div class="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-purple-200 dark:bg-purple-900 blur-[100px] opacity-30 animate-pulse" style="animation-delay: 2s;"></div>
+    <div class="relative w-[500px] h-[500px] flex items-center justify-center">
+        <div class="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-110"></div>
+        
+        <div class="parallax-item absolute z-20" data-speed="0.05">
+            <div class="w-64 h-48 bg-gradient-to-b from-white to-[#ffeef6] rounded-[60px] cloud-body relative flex items-center justify-center">
+                <div class="absolute left-8 top-1/2 w-8 h-4 bg-[#ffb7d5] rounded-full blur-md opacity-60"></div>
+                <div class="absolute right-8 top-1/2 w-8 h-4 bg-[#ffb7d5] rounded-full blur-md opacity-60"></div>
+                <div class="flex flex-col items-center gap-4 mt-4">
+                    <div class="flex gap-10">
+                        <div class="w-4 h-6 bg-[#2d1622] rounded-full relative overflow-hidden animate-blink">
+                            <div class="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full eye-pupil"></div>
+                        </div>
+                        <div class="w-4 h-6 bg-[#2d1622] rounded-full relative overflow-hidden animate-blink">
+                            <div class="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full eye-pupil"></div>
+                        </div>
+                    </div>
+                    <div class="w-8 h-4 border-b-4 border-[#2d1622] rounded-full"></div>
+                </div>
+                <div class="absolute -top-8 left-10 w-24 h-24 bg-gradient-to-b from-white to-[#fff0f5] rounded-full -z-10"></div>
+                <div class="absolute -top-4 right-8 w-20 h-20 bg-gradient-to-b from-white to-[#fff0f5] rounded-full -z-10"></div>
+                <div class="absolute top-8 -left-8 w-20 h-20 bg-gradient-to-b from-white to-[#ffeef6] rounded-full -z-10"></div>
+                <div class="absolute top-4 -right-6 w-16 h-16 bg-gradient-to-b from-white to-[#ffeef6] rounded-full -z-10"></div>
+            </div>
+        </div>
+
+        <div class="parallax-item absolute -left-4 top-10 z-10" data-speed="0.08">
+            <div class="w-40 h-32 bg-gradient-to-b from-[#f3e7ff] to-[#e0c3fc] rounded-[40px] cloud-body relative flex items-center justify-center opacity-90 transform -rotate-12">
+                <div class="flex flex-col items-center gap-2 mt-2">
+                    <div class="flex gap-6">
+                        <div class="w-3 h-2 border-t-2 border-[#4a2c3d] rounded-full"></div>
+                        <div class="w-3 h-2 border-t-2 border-[#4a2c3d] rounded-full"></div>
+                    </div>
+                    <div class="w-2 h-2 bg-[#4a2c3d] rounded-full"></div>
+                </div>
+                <div class="absolute -top-6 left-4 w-16 h-16 bg-[#f3e7ff] rounded-full -z-10"></div>
+                <div class="absolute top-4 -left-6 w-14 h-14 bg-[#f3e7ff] rounded-full -z-10"></div>
+            </div>
+        </div>
+
+        <div class="parallax-item absolute right-0 bottom-10 z-30" data-speed="0.06">
+            <div class="w-32 h-24 bg-gradient-to-b from-[#fff5eb] to-[#ffdec2] rounded-[30px] cloud-body relative flex items-center justify-center transform rotate-6">
+                <div class="flex flex-col items-center gap-1 mt-1">
+                    <div class="flex gap-4">
+                        <div class="w-2 h-2 bg-[#5c3a2e] rounded-full"></div>
+                        <div class="w-2 h-2 bg-[#5c3a2e] rounded-full"></div>
+                    </div>
+                    <div class="absolute top-1/2 left-2 w-3 h-2 bg-[#ff9e9e] blur-sm rounded-full"></div>
+                    <div class="absolute top-1/2 right-2 w-3 h-2 bg-[#ff9e9e] blur-sm rounded-full"></div>
+                    <div class="w-3 h-1.5 bg-[#5c3a2e] rounded-b-full"></div>
+                </div>
+                <div class="absolute -top-4 right-2 w-12 h-12 bg-[#fff5eb] rounded-full -z-10"></div>
+                <div class="absolute top-2 -right-4 w-10 h-10 bg-[#fff5eb] rounded-full -z-10"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="parallax-item absolute bottom-12 left-12 right-12 text-white z-40" data-speed="0.01">
+        <div class="backdrop-blur-sm bg-white/10 p-6 rounded-3xl border border-white/20">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="size-8 rounded-full bg-white flex items-center justify-center text-primary shadow-lg">
+                    <span class="material-symbols-outlined text-xl">spa</span>
+                </div>
+                <span class="text-sm font-bold tracking-wider uppercase text-white drop-shadow-md">Lumina Beauty</span>
+            </div>
+            <h2 class="text-3xl font-bold leading-tight mb-2 drop-shadow-md">สวัสดีลูกค้าทุกท่าน!</h2>
+            <p class="text-base text-white/90 drop-shadow-sm">เข้าร่วมกับเรา และค้นพบผลิตภัณฑ์ที่จะทำให้คุณรู้สึกราวกับล่องลอยอยู่บนปุยเมฆเหมือนดั่งนางฟ้า</p>
+        </div>
+    </div>
 </div>
 
-<header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-8 relative z-50">
-    <div class="max-w-7xl mx-auto flex justify-between items-center h-12">
-        <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
-            <span class="material-icons-round text-primary text-4xl">spa</span>
-            <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
-        </a>
-
-        <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-20">
-            <a class="flex flex-col items-center justify-center cursor-default pointer-events-none">
-                <span class="text-[18px] font-bold text-primary dark:text-primary leading-tight">สินค้า</span>
-                <span class="text-[13px] text-primary/80 dark:text-primary/80">(Shop)</span>
-            </a>
-            
-            <div class="relative group">
-                <button class="flex flex-col items-center justify-center transition pb-2 pt-2">
-                    <div class="flex items-center gap-1">
-                        <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">หมวดหมู่</span>
-                        <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
-                    </div>
-                    <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Categories)</span>
-                </button>
-                <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
-                        <?php foreach($categories_list as $c): ?>
-                            <a href="?category[]=<?= $c['c_id'] ?>" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition"><?= htmlspecialchars($c['c_name']) ?></a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-
-            <a class="group flex flex-col items-center justify-center transition" href="promotions.php">
-                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">โปรโมชั่น</span>
-                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Sale)</span>
-            </a>
-            <a class="group flex flex-col items-center justify-center transition" href="../auth/contact.php">
-                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">ติดต่อเรา</span>
-                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Contact)</span>
-            </a>
-        </div>
-
-        <div class="flex items-center space-x-3 sm:space-x-5 text-gray-600 dark:text-gray-300">
-            <div class="hidden xl:block relative group">
-                <form action="products.php" method="GET">
-                    <input id="liveSearchInput" name="search" value="<?= htmlspecialchars($search_query) ?>" class="pl-10 pr-4 py-2 rounded-full border border-pink-200 dark:border-gray-700 bg-input-bg dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm w-48 xl:w-56 transition-all relative z-10" placeholder="ค้นหาสินค้า..." type="text" autocomplete="off"/>
-                    <button type="submit" class="material-icons-round absolute left-3 top-2 text-gray-400 z-10">search</button>
-                </form>
-            </div>
-            <a href="favorites.php" class="hover:text-primary transition relative flex items-center">
-                <span class="material-icons-round text-2xl">favorite_border</span>
-            </a>
-            <a href="cart.php" class="hover:text-primary transition relative flex items-center">
-                <span class="material-icons-round text-2xl">shopping_bag</span>
-                <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800">
-                    <?= $totalCartItems ?>
-                </span>
-            </a>
-            
-            <button class="hover:text-primary transition flex items-center justify-center" onclick="toggleTheme()">
-                <span class="material-icons-round dark:hidden text-2xl text-gray-500">dark_mode</span>
-                <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
-            </button>
-
-            <div class="relative group flex items-center">
-                <a href="../profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
-                    <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                        <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
-                    </div>
-                </a>
-                <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
-                    <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
-                        
-                        <div class="text-center mb-4">
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                <?= $isLoggedIn ? htmlspecialchars($userData['u_email']) : 'กรุณาเข้าสู่ระบบเพื่อใช้งาน' ?>
-                            </span>
-                        </div>
-
-                        <div class="flex justify-center relative mb-4">
-                            <div class="rounded-full p-[3px] bg-primary shadow-md">
-                                <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
-                                    <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="text-center mt-2 mb-6">
-                            <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดีคุณ <?= htmlspecialchars($userData['u_username']) ?></h3>
-                        </div>
-
-                        <div class="flex flex-col gap-3 mt-2">
-                            <?php if($isLoggedIn): ?>
-                                <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    จัดการบัญชี
-                                </a>
-                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
-                                </a>
-                            <?php else: ?>
-                                <a href="../auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
-                                </a>
-                                <a href="../auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
-                                </a>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="flex justify-center items-center gap-2 mt-5 text-[11px] text-gray-400">
-                            <a href="#" class="hover:text-primary">นโยบายความเป็นส่วนตัว</a>
-                            <span>•</span>
-                            <a href="#" class="hover:text-primary">ข้อกำหนดบริการ</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+<div class="flex w-full lg:w-1/2 flex-col items-center justify-center p-6 md:p-12 lg:p-24 bg-surface-light dark:bg-surface-dark relative">
+    <div class="lg:hidden absolute top-6 left-6 flex items-center gap-2 text-primary">
+        <span class="material-symbols-outlined text-3xl">spa</span>
+        <span class="text-xl font-bold tracking-tight text-[#1b0d14] dark:text-white">Lumina</span>
     </div>
-</header>
 
-<main class="relative z-10 w-full min-h-[calc(100vh-80px)] pb-20">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-lg gradient-border-box p-10 md:p-14 relative">
         
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 relative z-20">
-            <div class="mb-4 md:mb-0 text-center md:text-left">
-                <div class="inline-flex items-center gap-2 bg-white dark:bg-surface-dark px-6 py-2 rounded-full shadow-soft border border-pink-50 dark:border-gray-800">
-                    <span class="material-icons-round text-primary text-2xl">grid_view</span>
-                    <h1 class="text-2xl font-display font-bold text-gray-800 dark:text-white">สินค้าทั้งหมด</h1>
+        <span class="material-symbols-outlined corner-decor text-[#fcb69f]" style="top: 10px; left: 10px;">auto_awesome</span>
+        <span class="material-symbols-outlined corner-decor text-[#e0c3fc]" style="bottom: 10px; right: 10px;">auto_awesome</span>
+        <span class="material-symbols-outlined corner-decor text-[#ffecd2]" style="top: 10px; right: 10px; transform: scale(0.7);">star</span>
+        
+        <div class="flex flex-col gap-8 relative z-10">
+            <div class="flex flex-col gap-2">
+                <div class="hidden lg:flex items-center gap-2 text-primary mb-2">
+                    <span class="material-symbols-outlined text-4xl">spa</span>
                 </div>
-                <p class="text-gray-500 dark:text-gray-400 mt-3 ml-2 font-medium">พบสินค้า <?= number_format($total_products) ?> รายการ</p>
+                <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-[#1b0d14] dark:text-white">ยินดีต้อนรับกลับมา</h1>
+                <p class="text-[#9a4c73] dark:text-[#dcbccc] text-base">กรุณากรอกข้อมูลเพื่อเข้าสู่ระบบ</p>
             </div>
-            
-            <div class="relative">
-                <div class="flex items-center space-x-2 bg-white dark:bg-surface-dark px-4 py-2.5 rounded-full shadow-soft border border-pink-50 dark:border-gray-800">
-                    <span class="text-gray-500 text-sm material-icons-round text-[18px]">sort</span>
-                    <span class="text-gray-500 text-sm font-medium">เรียงตาม:</span>
-                    <select id="sortSelect" onchange="applyFilters()" class="bg-transparent border-none text-sm font-bold text-gray-800 dark:text-white focus:ring-0 pr-6 py-0 cursor-pointer outline-none">
-                        <option value="latest" <?= $sort_by == 'latest' ? 'selected' : '' ?>>ล่าสุด</option>
-                        <option value="popular" <?= $sort_by == 'popular' ? 'selected' : '' ?>>ยอดนิยม</option>
-                        <option value="price_asc" <?= $sort_by == 'price_asc' ? 'selected' : '' ?>>ราคา: ต่ำไปสูง</option>
-                        <option value="price_desc" <?= $sort_by == 'price_desc' ? 'selected' : '' ?>>ราคา: สูงไปต่ำ</option>
-                    </select>
+
+            <form id="loginForm" action="" class="flex flex-col gap-5 w-full" method="POST" novalidate onsubmit="return validateLoginForm(event)">
+                <div class="flex flex-col gap-2 group">
+                    <label class="text-sm font-semibold text-[#1b0d14] dark:text-[#f3e7ed] ml-1" for="login_id">อีเมล หรือ ชื่อผู้ใช้</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#9a4c73]">
+                            <span class="material-symbols-outlined text-[20px]">person</span>
+                        </div>
+                        <input class="w-full pl-11 pr-4 py-3.5 bg-[#fcf8fa] dark:bg-[#1f0e16] border border-[#e7cfdb] dark:border-[#5a3a4a] rounded-full text-[#1b0d14] dark:text-white placeholder:text-[#9a4c73]/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200" id="login_id" name="login_id" placeholder="กรอกอีเมล หรือ ชื่อผู้ใช้" type="text"/>
+                    </div>
                 </div>
+                <div class="flex flex-col gap-2 group">
+                    <label class="text-sm font-semibold text-[#1b0d14] dark:text-[#f3e7ed] ml-1" for="password">รหัสผ่าน</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#9a4c73]">
+                            <span class="material-symbols-outlined text-[20px]">lock</span>
+                        </div>
+                        <input class="w-full pl-11 pr-4 py-3.5 bg-[#fcf8fa] dark:bg-[#1f0e16] border border-[#e7cfdb] dark:border-[#5a3a4a] rounded-full text-[#1b0d14] dark:text-white placeholder:text-[#9a4c73]/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200" id="password" name="password" placeholder="กรอกรหัสผ่านของคุณ" type="password"/>
+                        <button class="absolute inset-y-0 right-0 pr-4 flex items-center text-[#9a4c73] hover:text-primary transition-colors cursor-pointer" type="button" onclick="togglePassword()">
+                            <span id="password-icon" class="material-symbols-outlined text-[20px]">visibility_off</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between px-1">
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <div class="relative flex items-center">
+                            <input class="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-[#e7cfdb] dark:border-[#5a3a4a] bg-transparent checked:bg-primary checked:border-primary transition-all" type="checkbox"/>
+                            <span class="material-symbols-outlined absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[16px] text-white opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity">check</span>
+                        </div>
+                        <span class="text-sm font-medium text-[#5a3a4a] dark:text-[#dcbccc] group-hover:text-primary transition-colors">จดจำฉัน</span>
+                    </label>
+                    <a class="text-sm font-bold text-primary hover:text-[#c41e6e] transition-colors" href="#">ลืมรหัสผ่าน?</a>
+                </div>
+                <button type="submit" class="w-full mt-2 bg-primary hover:bg-[#d6207a] text-white text-base font-bold py-3.5 px-6 rounded-full shadow-lg shadow-primary/30 transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2">
+                    <span>เข้าสู่ระบบ</span>
+                    <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+                </button>
+            </form>
+
+            <div class="relative flex items-center py-2">
+                <div class="flex-grow border-t border-[#e7cfdb] dark:border-[#5a3a4a]"></div>
+                <span class="flex-shrink-0 mx-4 text-sm font-medium text-[#9a4c73]">หรือเข้าสู่ระบบด้วย</span>
+                <div class="flex-grow border-t border-[#e7cfdb] dark:border-[#5a3a4a]"></div>
             </div>
-        </div>
 
-        <div class="flex flex-col lg:flex-row gap-8">
-            
-            <aside class="w-full lg:w-64 flex-shrink-0">
-                <div class="bg-white dark:bg-surface-dark rounded-3xl p-6 shadow-soft sticky top-28 border border-pink-50 dark:border-gray-800">
-                    <div class="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">
-                        <h3 class="font-display font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
-                            <span class="material-icons-round text-primary text-[20px]">filter_alt</span> ตัวกรอง
-                        </h3>
-                        <span onclick="window.location.href='products.php'" class="text-sm text-gray-400 cursor-pointer hover:text-primary transition-colors">ล้างค่า</span>
-                    </div>
+            <div class="flex justify-center gap-4">
+                <button onclick="mockGoogleLogin()" class="flex items-center justify-center size-12 rounded-full border border-[#e7cfdb] dark:border-[#5a3a4a] bg-white dark:bg-[#1f0e16] hover:bg-[#fcf8fa] dark:hover:bg-[#2d1622] hover:border-primary/50 transition-all duration-200 group">
+                    <svg class="size-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"></path>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+                    </svg>
+                </button>
+                <button onclick="mockSocialLogin('Apple')" class="flex items-center justify-center size-12 rounded-full border border-[#e7cfdb] dark:border-[#5a3a4a] bg-white dark:bg-[#1f0e16] hover:bg-[#fcf8fa] dark:hover:bg-[#2d1622] hover:border-primary/50 transition-all duration-200 text-[#1b0d14] dark:text-white group">
+                    <svg class="size-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.05 20.28c-.98.95-2.05.88-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.64 3.4 1.63-3.12 1.88-2.68 5.86.1 6.94-.5 1.49-1.15 2.96-2.15 4.44zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"></path>
+                    </svg>
+                </button>
+                <button onclick="mockSocialLogin('Facebook')" class="flex items-center justify-center size-12 rounded-full border border-[#e7cfdb] dark:border-[#5a3a4a] bg-white dark:bg-[#1f0e16] hover:bg-[#fcf8fa] dark:hover:bg-[#2d1622] hover:border-primary/50 transition-all duration-200 text-[#1877F2] group">
+                    <svg class="size-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z"></path>
+                    </svg>
+                </button>
+            </div>
 
-                    <div class="mb-8">
-                        <h4 class="font-bold text-gray-800 dark:text-gray-200 mb-4 text-sm">หมวดหมู่สินค้า</h4>
-                        <ul class="space-y-3">
-                            <?php foreach($categories_list as $cat): 
-                                $checked = in_array($cat['c_id'], $selected_cats) ? 'checked' : '';
-                            ?>
-                            <li>
-                                <label class="flex items-center group cursor-pointer">
-                                    <input type="checkbox" value="<?= $cat['c_id'] ?>" class="cat-checkbox rounded text-primary focus:ring-primary border-gray-300 dark:border-gray-600 dark:bg-gray-700 mr-3 w-4 h-4 transition-all" onchange="applyFilters()" <?= $checked ?>>
-                                    <span class="text-gray-600 dark:text-gray-400 group-hover:text-primary transition-colors text-sm"><?= htmlspecialchars($cat['c_name']) ?></span>
-                                </label>
-                            </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h4 class="font-bold text-gray-800 dark:text-gray-200 mb-4 text-sm">ราคาไม่เกิน</h4>
-                        <div class="px-2">
-                            <input class="w-full mb-4" max="5000" min="0" step="100" type="range" id="priceRange" value="<?= $max_price ?>" onchange="applyFilters()" oninput="document.getElementById('priceValue').textContent = '฿' + Number(this.value).toLocaleString()"/>
-                            <div class="flex justify-between items-center text-sm font-medium text-gray-600 dark:text-gray-300">
-                                <span class="bg-pink-50 dark:bg-gray-800 text-primary px-3 py-1 rounded-lg">฿0</span>
-                                <span class="text-gray-400">-</span>
-                                <span class="bg-pink-50 dark:bg-gray-800 text-primary px-3 py-1 rounded-lg" id="priceValue">฿<?= number_format($max_price) ?></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-
-            <div class="flex-1">
-                <?php if ($total_products > 0): ?>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        
-                        <?php foreach($products as $p): 
-                            $p_id = $p['p_id'];
-                            $p_name = htmlspecialchars($p['p_name']);
-                            $p_price = number_format($p['p_price']);
-                            // เช็คว่ามีรูปหลักไหม ถ้าไม่มีให้ใช้ placeholder
-                            $p_image = (!empty($p['p_image']) && file_exists("../uploads/products/" . $p['p_image'])) 
-                                        ? "../uploads/products/" . $p['p_image'] 
-                                        : "https://via.placeholder.com/400x400.png?text=No+Image";
-                        ?>
-                            <div class="bg-white dark:bg-surface-dark rounded-[24px] p-4 shadow-soft hover:shadow-glow transition-all duration-300 group hover:-translate-y-2 relative flex flex-col border border-transparent dark:border-gray-700">
-                                
-                                <form action="favorites.php" method="POST" class="absolute top-4 right-4 z-10">
-                                    <input type="hidden" name="action" value="add_fav">
-                                    <input type="hidden" name="p_id" value="<?= $p_id ?>">
-                                    <button type="submit" class="text-gray-300 hover:text-primary hover:scale-110 transition-all bg-white/50 dark:bg-black/30 rounded-full p-1 backdrop-blur-sm shadow-sm" title="เพิ่มในสิ่งที่ถูกใจ">
-                                        <span class="material-icons-round text-2xl">favorite_border</span>
-                                    </button>
-                                </form>
-                                
-                                <a href="productdetail.php?id=<?= $p_id ?>" class="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 relative flex items-center justify-center block cursor-pointer">
-                                    <img alt="<?= $p_name ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="<?= $p_image ?>"/>
-                                    <?php if($p['p_stock'] <= 0): ?>
-                                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-sm">
-                                            <span class="bg-white text-gray-800 font-bold px-4 py-1.5 rounded-full shadow-lg">สินค้าหมด</span>
-                                        </div>
-                                    <?php endif; ?>
-                                </a>
-                                
-                                <div class="flex-1 flex flex-col px-1">
-                                    <h3 class="text-md font-display font-bold text-gray-800 dark:text-white mb-1 leading-tight line-clamp-1" title="<?= $p_name ?>"><?= $p_name ?></h3>
-                                    
-                                    <div class="flex items-center mb-2">
-                                        <span class="material-icons-round text-yellow-400 text-[12px]">star</span>
-                                        <span class="material-icons-round text-yellow-400 text-[12px]">star</span>
-                                        <span class="material-icons-round text-yellow-400 text-[12px]">star</span>
-                                        <span class="material-icons-round text-yellow-400 text-[12px]">star</span>
-                                        <span class="material-icons-round text-yellow-400 text-[12px]">star_half</span>
-                                    </div>
-                                    
-                                    <div class="mt-auto flex justify-between items-center mb-3">
-                                        <span class="text-lg font-bold text-primary">฿<?= $p_price ?></span>
-                                    </div>
-                                    
-                                    <form action="cart.php" method="POST" class="mt-auto">
-                                        <input type="hidden" name="action" value="add">
-                                        <input type="hidden" name="p_id" value="<?= $p_id ?>">
-                                        <?php if($p['p_stock'] > 0): ?>
-                                            <button type="submit" class="w-full bg-pink-50 dark:bg-gray-800 text-primary dark:text-pink-400 hover:bg-primary hover:text-white py-2 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1">
-                                                <span class="material-icons-round text-[16px]">shopping_cart</span> ใส่ตะกร้า
-                                            </button>
-                                        <?php else: ?>
-                                            <button disabled class="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-1 cursor-not-allowed">
-                                                <span class="material-icons-round text-[16px]">remove_shopping_cart</span> สินค้าหมด
-                                            </button>
-                                        <?php endif; ?>
-                                    </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <?php if ($total_pages > 1): ?>
-                    <div class="mt-12 flex justify-center items-center space-x-2">
-                        <?php if ($page > 1): ?>
-                        <a href="javascript:goToPage(<?= $page - 1 ?>)" class="w-10 h-10 rounded-full bg-white dark:bg-surface-dark shadow-sm flex items-center justify-center text-gray-500 hover:text-primary transition-colors border border-gray-100 dark:border-gray-700">
-                            <span class="material-icons-round">chevron_left</span>
-                        </a>
-                        <?php endif; ?>
-
-                        <?php for($i = 1; $i <= $total_pages; $i++): ?>
-                            <?php if ($i == $page): ?>
-                                <button class="w-10 h-10 rounded-full bg-primary text-white shadow-md flex items-center justify-center font-bold">
-                                    <?= $i ?>
-                                </button>
-                            <?php else: ?>
-                                <a href="javascript:goToPage(<?= $i ?>)" class="w-10 h-10 rounded-full bg-white dark:bg-surface-dark shadow-sm flex items-center justify-center text-gray-500 hover:text-primary hover:bg-pink-50 transition-all font-medium border border-gray-100 dark:border-gray-700">
-                                    <?= $i ?>
-                                </a>
-                            <?php endif; ?>
-                        <?php endfor; ?>
-
-                        <?php if ($page < $total_pages): ?>
-                        <a href="javascript:goToPage(<?= $page + 1 ?>)" class="w-10 h-10 rounded-full bg-white dark:bg-surface-dark shadow-sm flex items-center justify-center text-gray-500 hover:text-primary transition-colors border border-gray-100 dark:border-gray-700">
-                            <span class="material-icons-round">chevron_right</span>
-                        </a>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-
-                <?php else: ?>
-                    <div class="bg-white dark:bg-surface-dark rounded-3xl p-16 shadow-soft text-center border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center min-h-[400px]">
-                        <div class="w-24 h-24 bg-pink-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6 text-primary opacity-80">
-                            <span class="material-icons-round text-6xl">search_off</span>
-                        </div>
-                        <h3 class="text-2xl font-display font-bold text-gray-800 dark:text-white mb-2">ไม่พบสินค้าที่คุณค้นหา</h3>
-                        <p class="text-gray-500 dark:text-gray-400 max-w-md mx-auto">ลองเปลี่ยนเงื่อนไขตัวกรอง หมวดหมู่ หรือช่วงราคาดูอีกครั้ง</p>
-                        <button onclick="window.location.href='products.php'" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-medium hover:bg-pink-600 transition">ล้างตัวกรองทั้งหมด</button>
-                    </div>
-                <?php endif; ?>
-
+            <div class="text-center mt-4">
+                <p class="text-sm text-[#5a3a4a] dark:text-[#dcbccc]">
+                    ยังไม่เป็นสมาชิก Lumina? 
+                    <a class="font-bold text-primary hover:text-[#c41e6e] transition-colors" href="register.php">สมัครสมาชิก</a>
+                </p>
             </div>
         </div>
     </div>
-</main>
-
-<footer class="bg-white dark:bg-surface-dark py-10 border-t border-pink-50 dark:border-gray-800 mt-auto relative z-20">
-    <div class="max-w-7xl mx-auto px-4 text-center">
-        <div class="flex justify-center items-center mb-4 opacity-80">
-            <span class="text-primary material-icons-round text-3xl mr-2">spa</span>
-            <span class="font-display font-bold text-2xl text-gray-800 dark:text-white">Lumina Beauty</span>
-        </div>
-        <p class="text-gray-400 text-sm">© 2026 Lumina Beauty. All rights reserved.</p>
+    
+    <div class="absolute bottom-0 right-0 p-8 hidden lg:block pointer-events-none opacity-20">
+        <span class="material-symbols-outlined text-[120px] text-primary rotate-12">brush</span>
     </div>
-</footer>
+</div>
+</div>
 
 <script>
-    if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
-    function toggleTheme() {
-        const htmlEl = document.documentElement;
-        htmlEl.classList.toggle('dark');
-        localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
+    function validateLoginForm(e) {
+        e.preventDefault(); 
+        
+        const login_id = document.getElementById('login_id').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!login_id || !password) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'ข้อมูลไม่ครบถ้วน',
+                text: 'กรุณากรอกอีเมล หรือ ชื่อผู้ใช้ และรหัสผ่านให้ครบถ้วนค่ะ',
+                confirmButtonColor: '#ee2b8c'
+            });
+            return false;
+        }
+
+        document.getElementById('loginForm').submit();
     }
 
-    function applyFilters() {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('page');
+    <?php if($alertType === 'success'): ?>
+        Swal.fire({
+            icon: 'success',
+            title: 'สำเร็จ!',
+            text: '<?php echo $alertMsg; ?>',
+            timer: 1500,
+            showConfirmButton: false
+        }).then(() => {
+            window.location.href = '../home.php'; 
+        });
+    <?php elseif($alertType === 'error'): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'ล้มเหลว',
+            text: '<?php echo $alertMsg; ?>',
+            confirmButtonColor: '#ee2b8c'
+        });
+    <?php endif; ?>
 
-        // อ่านค่า search จากช่อง input ถ้างงว่าทำไมต้องเช็ค 2 รอบ คือป้องกันการพิมพ์ว่างๆ ครับ
-        const searchInput = document.querySelector('input[name="search"]');
-        if(searchInput && searchInput.value) url.searchParams.set('search', searchInput.value);
-        else url.searchParams.delete('search');
+    function togglePassword() {
+        const passwordInput = document.getElementById('password');
+        const icon = document.getElementById('password-icon');
+        
+        if (passwordInput.type === "password") {
+            passwordInput.type = "text";
+            icon.textContent = "visibility";
+        } else {
+            passwordInput.type = "password";
+            icon.textContent = "visibility_off";
+        }
+    }
 
-        const sort = document.getElementById('sortSelect').value;
-        if(sort) url.searchParams.set('sort', sort);
+    document.addEventListener("mousemove", (e) => {
+        const visualContainer = document.getElementById('visual-container');
+        const items = document.querySelectorAll('.parallax-item');
+        
+        const centerX = window.innerWidth / 4; 
+        const centerY = window.innerHeight / 2;
 
-        const maxPrice = document.getElementById('priceRange').value;
-        url.searchParams.set('max_price', maxPrice);
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
 
-        url.searchParams.delete('category[]');
-        document.querySelectorAll('.cat-checkbox:checked').forEach(cb => {
-            url.searchParams.append('category[]', cb.value);
+        items.forEach(item => {
+            const speed = parseFloat(item.getAttribute('data-speed')) || 0.05;
+            const x = (mouseX - centerX) * speed;
+            const y = (mouseY - centerY) * speed;
+            item.style.transform = `translate(${x}px, ${y}px)`;
         });
 
-        window.location.href = url.toString();
+        const pupils = document.querySelectorAll('.eye-pupil');
+        pupils.forEach(pupil => {
+            const eye = pupil.parentElement;
+            const rect = eye.getBoundingClientRect();
+            const eyeCenterX = rect.left + rect.width / 2;
+            const eyeCenterY = rect.top + rect.height / 2;
+            
+            const angle = Math.atan2(mouseY - eyeCenterY, mouseX - eyeCenterX);
+            const distance = Math.min(3, Math.hypot(mouseX - eyeCenterX, mouseY - eyeCenterY));
+            
+            const moveX = Math.cos(angle) * distance;
+            const moveY = Math.sin(angle) * distance;
+            
+            pupil.style.transform = `translate(${moveX}px, ${moveY}px)`;
+        });
+    });
+
+    function mockGoogleLogin() {
+        const width = 500;
+        const height = 600;
+        const left = (window.innerWidth - width) / 2;
+        const top = (window.innerHeight - height) / 2;
+        const popup = window.open("", "Google Login", `width=${width},height=${height},top=${top},left=${left}`);
+        
+        if (popup) {
+            popup.document.write(`
+                <h2 style="font-family:sans-serif; text-align:center; margin-top:50px;">Connecting to Google...</h2>
+                <p style="font-family:sans-serif; text-align:center;">(Simulation Mode)</p>
+            `);
+            setTimeout(() => {
+                popup.close();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'สำเร็จ',
+                    text: 'Login with Google สำเร็จ!',
+                    confirmButtonColor: '#ee2b8c'
+                }).then(() => {
+                    window.location.href = "../home.php";
+                });
+            }, 1500);
+        }
     }
 
-    function goToPage(pageNumber) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('page', pageNumber);
-        window.location.href = url.toString();
+    function mockSocialLogin(provider) {
+        Swal.fire({
+            icon: 'info',
+            title: `เชื่อมต่อ ${provider}`,
+            text: `กำลังเชื่อมต่อกับ ${provider}... (ในโหมดจริงจะเด้งหน้าต่าง Login)`,
+            showConfirmButton: false,
+            timer: 1500
+        }).then(() => {
+             window.location.href = "../home.php";
+        });
     }
 </script>
-</body></html>
+
+</body>
+</html>
