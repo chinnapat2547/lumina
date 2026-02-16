@@ -12,8 +12,19 @@ if (!isset($_SESSION['u_id'])) {
 $isLoggedIn = true;
 $u_id = $_SESSION['u_id'];
 $profileImage = "https://ui-avatars.com/api/?name=User&background=F43F85&color=fff";
+
+// ตัวแปรสำหรับรับค่าจาก Session (เพื่อแก้ปัญหา Refresh แล้วข้อมูลหาย)
 $success_msg = '';
 $error_msg = '';
+
+if (isset($_SESSION['alert_success'])) {
+    $success_msg = $_SESSION['alert_success'];
+    unset($_SESSION['alert_success']);
+}
+if (isset($_SESSION['alert_error'])) {
+    $error_msg = $_SESSION['alert_error'];
+    unset($_SESSION['alert_error']);
+}
 
 // ==========================================
 // 1. จัดการการเพิ่ม/แก้ไขที่อยู่ (Insert/Update)
@@ -40,7 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($stmt = mysqli_prepare($conn, $sql)) {
             mysqli_stmt_bind_param($stmt, "isssssssi", $u_id, $label, $name, $phone, $detail, $district, $province, $zipcode, $is_first);
             if (mysqli_stmt_execute($stmt)) {
-                $success_msg = "เพิ่มที่อยู่ $label สำเร็จ!";
+                // เก็บข้อความลง Session และ Redirect เพื่อแก้ปัญหา Refresh
+                $_SESSION['alert_success'] = "เพิ่มที่อยู่ $label สำเร็จ!";
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
             } else {
                 $error_msg = "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
             }
@@ -53,7 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($stmt = mysqli_prepare($conn, $sql)) {
             mysqli_stmt_bind_param($stmt, "sssssssii", $label, $name, $phone, $detail, $district, $province, $zipcode, $addr_id, $u_id);
             if (mysqli_stmt_execute($stmt)) {
-                $success_msg = "อัปเดตข้อมูลที่อยู่สำเร็จ!";
+                // เก็บข้อความลง Session และ Redirect เพื่อแก้ปัญหา Refresh
+                $_SESSION['alert_success'] = "อัปเดตข้อมูลที่อยู่สำเร็จ!";
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
             }
             mysqli_stmt_close($stmt);
         }
@@ -70,6 +87,7 @@ if (isset($_GET['delete_addr'])) {
         mysqli_stmt_bind_param($stmt, "ii", $delete_id, $u_id);
         mysqli_stmt_execute($stmt);
         mysqli_stmt_close($stmt);
+        // เพิ่ม session alert ตอนลบด้วยก็ได้ครับ
         header("Location: address.php");
         exit();
     }
@@ -99,7 +117,7 @@ if ($stmt = mysqli_prepare($conn, $sqlFetch)) {
 }
 
 // ==========================================
-// 4. ดึงข้อมูล User (Profile Image) - โค้ดชุดเดียวกับ Payment
+// 4. ดึงข้อมูล User (Profile Image)
 // ==========================================
 $sql = "SELECT a.u_username, a.u_email, u.u_image FROM `account` a LEFT JOIN `user` u ON a.u_id = u.u_id WHERE a.u_id = ?";
 if ($stmt = mysqli_prepare($conn, $sql)) {
@@ -278,38 +296,68 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <?php foreach ($addresses as $addr): ?>
-                        <div class="bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-6 border-2 <?= $addr['is_default'] ? 'border-primary/40' : 'border-transparent' ?> relative group">
-                            <?php if($addr['is_default']): ?>
-                                <span class="absolute top-4 right-4 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm">หลัก</span>
-                            <?php endif; ?>
+                        <div class="bg-gradient-to-br from-white to-pink-50/50 dark:from-gray-800 dark:to-gray-800 rounded-3xl p-6 border <?= $addr['is_default'] ? 'border-primary shadow-md shadow-pink-100' : 'border-gray-200 dark:border-gray-700 hover:border-pink-200 dark:hover:border-gray-600' ?> relative group overflow-hidden transition-all duration-300">
                             
-                            <h4 class="font-bold text-primary mb-1 flex items-center gap-1">
-                                <span class="material-icons-round text-sm">label</span> <?= htmlspecialchars($addr['addr_label']) ?>
-                            </h4>
-                            <p class="font-bold text-gray-800 dark:text-white"><?= htmlspecialchars($addr['recipient_name']) ?></p>
-                            <p class="text-xs text-gray-500 mb-3"><?= htmlspecialchars($addr['phone']) ?></p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 h-14 mb-4">
-                                <?= htmlspecialchars($addr['address_line']) ?> 
-                                <?= htmlspecialchars($addr['district']) ?> 
-                                <?= htmlspecialchars($addr['province']) ?> 
-                                <?= htmlspecialchars($addr['zipcode']) ?>
-                            </p>
-                            
-                            <div class="flex gap-2">
-                                <button onclick="openEditModal(<?= $addr['addr_id'] ?>, '<?= htmlspecialchars($addr['addr_label']) ?>', '<?= htmlspecialchars($addr['recipient_name']) ?>', '<?= htmlspecialchars($addr['phone']) ?>', '<?= htmlspecialchars($addr['address_line']) ?>', '<?= htmlspecialchars($addr['district']) ?>', '<?= htmlspecialchars($addr['province']) ?>', '<?= htmlspecialchars($addr['zipcode']) ?>')" class="flex-1 py-2 text-xs font-bold bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 transition-all">แก้ไข</button>
-                                <?php if(!$addr['is_default']): ?>
-                                    <a href="?set_default=<?= $addr['addr_id'] ?>" class="flex-1 py-2 text-xs font-bold bg-pink-50 text-primary rounded-xl text-center flex items-center justify-center">ใช้เป็นหลัก</a>
-                                    <a href="#" onclick="confirmDelete(<?= $addr['addr_id'] ?>, event)" class="px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all">ลบ</a>
-                                <?php endif; ?>
+                            <span class="material-icons-round absolute -bottom-4 -right-4 text-9xl text-primary/5 dark:text-white/5 pointer-events-none transform group-hover:scale-110 transition-transform duration-500">
+                                house
+                            </span>
+
+                            <div class="relative z-10">
+                                <div class="flex justify-between items-start mb-3">
+                                    <h4 class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold <?= $addr['is_default'] ? 'bg-primary text-white' : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300' ?>">
+                                        <span class="material-icons-round text-sm">label</span> <?= htmlspecialchars($addr['addr_label']) ?>
+                                    </h4>
+                                    <?php if($addr['is_default']): ?>
+                                        <span class="text-primary text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                            <span class="material-icons-round text-sm">check_circle</span> Default
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+
+                                <p class="text-xl font-bold text-gray-800 dark:text-white mb-3 tracking-tight">
+                                    <?= htmlspecialchars($addr['recipient_name']) ?>
+                                </p>
+                                
+                                <div class="space-y-2 mb-5">
+                                    <p class="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                                        <span class="material-icons-round text-primary text-lg">phone_iphone</span>
+                                        <?= htmlspecialchars($addr['phone']) ?>
+                                    </p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 flex items-start gap-2 h-14 overflow-hidden">
+                                        <span class="material-icons-round text-primary text-lg mt-0.5">location_on</span>
+                                        <span class="line-clamp-2 leading-relaxed">
+                                            <?= htmlspecialchars($addr['address_line']) ?> 
+                                            <?= htmlspecialchars($addr['district']) ?> 
+                                            <?= htmlspecialchars($addr['province']) ?> 
+                                            <?= htmlspecialchars($addr['zipcode']) ?>
+                                        </span>
+                                    </p>
+                                </div>
+                                
+                                <div class="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
+                                    <button onclick="openEditModal(<?= $addr['addr_id'] ?>, '<?= htmlspecialchars($addr['addr_label']) ?>', '<?= htmlspecialchars($addr['recipient_name']) ?>', '<?= htmlspecialchars($addr['phone']) ?>', '<?= htmlspecialchars($addr['address_line']) ?>', '<?= htmlspecialchars($addr['district']) ?>', '<?= htmlspecialchars($addr['province']) ?>', '<?= htmlspecialchars($addr['zipcode']) ?>')" 
+                                        class="flex-1 py-2 text-xs font-bold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-50 hover:text-primary dark:hover:bg-gray-600 transition-all flex items-center justify-center gap-1">
+                                        <span class="material-icons-round text-sm">edit</span> แก้ไข
+                                    </button>
+                                    
+                                    <?php if(!$addr['is_default']): ?>
+                                        <a href="?set_default=<?= $addr['addr_id'] ?>" class="flex-1 py-2 text-xs font-bold bg-pink-50 dark:bg-pink-900/30 text-primary rounded-xl text-center flex items-center justify-center hover:bg-pink-100 dark:hover:bg-pink-900/50 transition-all">
+                                            ใช้เป็นหลัก
+                                        </a>
+                                        <a href="#" onclick="confirmDelete(<?= $addr['addr_id'] ?>, event)" class="w-10 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                            <span class="material-icons-round">delete</span>
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
 
-                    <button onclick="openModal('addAddressModal')" class="h-44 rounded-3xl border-2 border-dashed border-pink-300 dark:border-gray-600 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-pink-50 dark:hover:bg-gray-800 transition-all group bg-white/50 dark:bg-card-dark">
-                        <div class="w-10 h-10 rounded-full bg-pink-100 dark:bg-gray-700 flex items-center justify-center group-hover:bg-primary transition-all">
-                            <span class="material-icons-round text-primary group-hover:text-white text-2xl">add</span>
+                    <button onclick="openModal('addAddressModal')" class="h-auto min-h-[240px] rounded-3xl border-2 border-dashed border-pink-300 dark:border-gray-600 flex flex-col items-center justify-center gap-3 hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-800 transition-all group bg-white/30 dark:bg-card-dark">
+                        <div class="w-14 h-14 rounded-full bg-pink-100 dark:bg-gray-700 flex items-center justify-center group-hover:bg-primary group-hover:scale-110 transition-all shadow-sm">
+                            <span class="material-icons-round text-primary group-hover:text-white text-3xl">add</span>
                         </div>
-                        <span class="font-bold text-gray-500 dark:text-gray-400 group-hover:text-primary">เพิ่มที่อยู่ใหม่</span>
+                        <span class="font-bold text-gray-500 dark:text-gray-400 group-hover:text-primary text-lg">เพิ่มที่อยู่ใหม่</span>
                     </button>
                 </div>
             </div>
@@ -406,6 +454,10 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
     document.addEventListener("DOMContentLoaded", function() {
         <?php if ($success_msg): ?>
             Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $success_msg ?>', confirmButtonColor: '#F43F85', customClass: { popup: 'rounded-3xl' }});
+        <?php endif; ?>
+        
+        <?php if ($error_msg): ?>
+            Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: '<?= $error_msg ?>', confirmButtonColor: '#F43F85', customClass: { popup: 'rounded-3xl' }});
         <?php endif; ?>
     });
 </script>
