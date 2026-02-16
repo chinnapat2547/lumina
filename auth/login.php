@@ -6,67 +6,67 @@ $alertMsg = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once '../config/connectdbuser.php';
 
-    // เปลี่ยนมารับค่าเป็นตัวแปร login_id (เป็นไปได้ทั้งอีเมลและชื่อผู้ใช้)
-    $login_id = $_POST['login_id'];
+    // เปลี่ยนมารับค่าเป็นตัวแปร login_id (เป็นไปได้ทั้งอีเมลและชื่อผู้ใช้) และใช้ trim ตัดช่องว่าง
+    $login_id = trim($_POST['login_id']);
     $password = $_POST['password'];
 
-    // 1. ค้นหาผู้ใช้จาก อีเมล หรือ ชื่อผู้ใช้ ในฐานข้อมูล account (User ปกติ)
-    $sql = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
-    if ($stmt = mysqli_prepare($conn, $sql)) {
-        // นำ $login_id ไปตรวจสอบทั้ง 2 เงื่อนไข
-        mysqli_stmt_bind_param($stmt, "ss", $login_id, $login_id);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
+    // 1. ค้นหาในตาราง adminaccount ก่อน (ให้สิทธิ์ Admin เป็นหลัก)
+    $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
+    if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
+        mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
+        mysqli_stmt_execute($stmtAdmin);
+        $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
 
-        // หากพบผู้ใช้นี้ในระบบ (เป็น User)
-        if (mysqli_num_rows($result) === 1) {
-            $row = mysqli_fetch_assoc($result);
+        // หากพบว่าเป็น Admin
+        if (mysqli_num_rows($resultAdmin) === 1) {
+            $rowAdmin = mysqli_fetch_assoc($resultAdmin);
             
-            // ตรวจสอบรหัสผ่าน
-            if (password_verify($password, $row['u_password']) || $password === $row['u_password']) {
-                // สร้าง Session เก็บข้อมูลผู้ใช้
-                $_SESSION['u_id'] = $row['u_id'];
-                $_SESSION['u_username'] = $row['u_username'];
-                $_SESSION['u_name'] = $row['u_name'];
+            // ตรวจสอบรหัสผ่าน Admin
+            if (password_verify($password, $rowAdmin['admin_password']) || $password === $rowAdmin['admin_password']) {
+                // สร้าง Session เก็บข้อมูลแอดมิน
+                $_SESSION['admin_id'] = $rowAdmin['admin_id'];
+                $_SESSION['admin_username'] = $rowAdmin['admin_username'];
                 
                 $alertType = "success";
-                $alertMsg = "เข้าสู่ระบบสำเร็จ!";
+                $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
             } else {
                 $alertType = "error";
-                $alertMsg = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+                $alertMsg = "รหัสผ่านแอดมินไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
             }
         } else {
-            // 2. หากไม่พบใน account ให้มาค้นหาในตาราง adminaccount ต่อ (เป็น Admin)
-            $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
-            if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
-                mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
-                mysqli_stmt_execute($stmtAdmin);
-                $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
+            // 2. หากไม่พบใน adminaccount ให้มาค้นหาในตาราง account (User ปกติ)
+            $sqlUser = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
+            if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
+                mysqli_stmt_bind_param($stmtUser, "ss", $login_id, $login_id);
+                mysqli_stmt_execute($stmtUser);
+                $resultUser = mysqli_stmt_get_result($stmtUser);
 
-                if (mysqli_num_rows($resultAdmin) === 1) {
-                    $rowAdmin = mysqli_fetch_assoc($resultAdmin);
+                // หากพบผู้ใช้นี้ในระบบ
+                if (mysqli_num_rows($resultUser) === 1) {
+                    $rowUser = mysqli_fetch_assoc($resultUser);
                     
-                    // ตรวจสอบรหัสผ่าน Admin
-                    if (password_verify($password, $rowAdmin['admin_password']) || $password === $rowAdmin['admin_password']) {
-                        // สร้าง Session เก็บข้อมูลแอดมิน
-                        $_SESSION['admin_id'] = $rowAdmin['admin_id'];
-                        $_SESSION['admin_username'] = $rowAdmin['admin_username'];
+                    // ตรวจสอบรหัสผ่าน
+                    if (password_verify($password, $rowUser['u_password']) || $password === $rowUser['u_password']) {
+                        // สร้าง Session เก็บข้อมูลผู้ใช้
+                        $_SESSION['u_id'] = $rowUser['u_id'];
+                        $_SESSION['u_username'] = $rowUser['u_username'];
+                        $_SESSION['u_name'] = $rowUser['u_name'];
                         
                         $alertType = "success";
-                        $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
+                        $alertMsg = "เข้าสู่ระบบสำเร็จ!";
                     } else {
                         $alertType = "error";
                         $alertMsg = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
                     }
                 } else {
-                    // หากไม่พบทั้ง 2 ตาราง
+                    // หากไม่พบทั้ง Admin และ User
                     $alertType = "error";
                     $alertMsg = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
                 }
-                mysqli_stmt_close($stmtAdmin);
+                mysqli_stmt_close($stmtUser);
             }
         }
-        mysqli_stmt_close($stmt);
+        mysqli_stmt_close($stmtAdmin);
     } else {
         $alertType = "error";
         $alertMsg = "เกิดข้อผิดพลาดในการตรวจสอบข้อมูล: " . mysqli_error($conn);
