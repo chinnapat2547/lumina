@@ -323,12 +323,36 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
                                         <span class="material-icons-round text-primary text-lg">phone_iphone</span>
                                         <?= htmlspecialchars($addr['phone']) ?>
                                     </p>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400 flex items-start gap-2 h-14 overflow-hidden">
-                                        <span class="material-icons-round text-primary text-lg mt-[1.5px] flex-shrink-0">location_on</span>
-                                        <span class="line-clamp-2 leading-relaxed">
-                                            <?= htmlspecialchars($addr['address_line'] . ' ' . $addr['district'] . ' ' . $addr['province'] . ' ' . $addr['zipcode']) ?>
-                                        </span>
-                                    </p>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+    
+                                    <div class="flex items-center gap-1 mb-2 text-primary">
+                                        <span class="material-icons-round text-lg">location_on</span>
+                                        <span class="font-bold text-gray-700 dark:text-gray-200">ข้อมูลการจัดส่ง</span>
+                                    </div>
+
+                                    <div class="flex flex-col gap-1 pl-1">
+                                    <div class="flex items-start">
+                                        <span class="font-semibold min-w-[95px] text-gray-700 dark:text-gray-300">ที่อยู่:</span>
+                                        <span class="break-words flex-1"><?= htmlspecialchars($addr['address_line']) ?></span>
+                                    </div>
+        
+                                    <div class="flex items-center">
+                                        <span class="font-semibold min-w-[95px] text-gray-700 dark:text-gray-300">อำเภอ:</span>
+                                        <span><?= htmlspecialchars($addr['district']) ?></span>
+                                    </div>
+                                    
+                                    <div class="flex items-center">
+                                        <span class="font-semibold min-w-[95px] text-gray-700 dark:text-gray-300">จังหวัด:</span>
+                                        <span><?= htmlspecialchars($addr['province']) ?></span>
+                                    </div>
+                                    
+                                    <div class="flex items-center">
+                                        <span class="font-semibold min-w-[95px] text-gray-700 dark:text-gray-300">รหัสไปรษณีย์:</span>
+                                        <span><?= htmlspecialchars($addr['zipcode']) ?></span>
+                                    </div>
+                                </div>
+
+                            </div>
                                 </div>
                                 
                                 <div class="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
