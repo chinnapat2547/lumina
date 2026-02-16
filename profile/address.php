@@ -324,7 +324,7 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
                                         <?= htmlspecialchars($addr['phone']) ?>
                                     </p>
                                     <p class="text-sm text-gray-500 dark:text-gray-400 flex items-start gap-2 h-14 overflow-hidden">
-                                        <span class="material-icons-round text-primary text-lg mt-[3px] flex-shrink-0">location_on</span>
+                                        <span class="material-icons-round text-primary text-lg mt-[1.5px] flex-shrink-0">location_on</span>
                                         <span class="line-clamp-2 leading-relaxed">
                                             <?= htmlspecialchars($addr['address_line'] . ' ' . $addr['district'] . ' ' . $addr['province'] . ' ' . $addr['zipcode']) ?>
                                         </span>
