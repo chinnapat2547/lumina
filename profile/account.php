@@ -17,7 +17,7 @@ $u_id = $_SESSION['u_id'];
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] == 0) {
     
     // [แก้จุดที่ 1] ใช้ __DIR__ เพื่อระบุที่อยู่ไฟล์แบบ Absolute Path (จำเป็นมากบน Cloud/Linux)
-    $target_dir = __DIR__ . "/uploads/";
+    $target_dir = __DIR__ . "uploads/";
     
     // สร้างโฟลเดอร์ถ้ายังไม่มี
     if (!is_dir($target_dir)) {
@@ -121,7 +121,7 @@ if (!empty($userData['u_gender'])) {
 $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($displayName) . "&background=F43F85&color=fff&size=150";
 
 // [แก้จุดที่ 2] ใช้ __DIR__ เช็คไฟล์จริง แต่ตัวแปร $profileImage ยังคงเป็น Relative Path เพื่อให้ Browser แสดงผลได้
-if (!empty($userData['u_image']) && file_exists(__DIR__ . "/uploads/" . $userData['u_image'])) {
+if (!empty($userData['u_image']) && file_exists(__DIR__ . "uploads/" . $userData['u_image'])) {
     $profileImage = "uploads/" . $userData['u_image'];
 }
 
