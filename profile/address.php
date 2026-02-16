@@ -291,7 +291,7 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
 
             <div class="bg-card-light dark:bg-card-dark rounded-3xl p-8 shadow-soft border border-transparent dark:border-gray-700">
                 <h3 class="text-lg font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-2 mb-6 flex items-center gap-2">
-                    <span class="material-icons-round text-primary">map</span> สถานที่จัดส่งของฉัน
+                    <span class="material-icons-round text-primary">map</span> ที่อยู่ของฉัน
                 </h3>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -324,12 +324,9 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
                                         <?= htmlspecialchars($addr['phone']) ?>
                                     </p>
                                     <p class="text-sm text-gray-500 dark:text-gray-400 flex items-start gap-2 h-14 overflow-hidden">
-                                        <span class="material-icons-round text-primary text-lg mt-0.5">location_on</span>
+                                        <span class="material-icons-round text-primary text-lg mt-[3px] flex-shrink-0">location_on</span>
                                         <span class="line-clamp-2 leading-relaxed">
-                                            <?= htmlspecialchars($addr['address_line']) ?> 
-                                            <?= htmlspecialchars($addr['district']) ?> 
-                                            <?= htmlspecialchars($addr['province']) ?> 
-                                            <?= htmlspecialchars($addr['zipcode']) ?>
+                                            <?= htmlspecialchars($addr['address_line'] . ' ' . $addr['district'] . ' ' . $addr['province'] . ' ' . $addr['zipcode']) ?>
                                         </span>
                                     </p>
                                 </div>
