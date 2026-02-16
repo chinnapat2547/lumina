@@ -1,9 +1,8 @@
 <?php
 session_start();
-// เรียกใช้ไฟล์เชื่อมต่อฐานข้อมูล
 require_once '../config/connectdbuser.php';
 
-// ตรวจสอบว่ามีการล็อกอินและมี Session u_id หรือไม่
+// ตรวจสอบ Login
 if (!isset($_SESSION['u_id'])) {
     header("Location: login.php");
     exit();
@@ -12,55 +11,82 @@ if (!isset($_SESSION['u_id'])) {
 $u_id = $_SESSION['u_id'];
 
 // ==========================================
-// ส่วนจัดการการอัปโหลดรูปภาพโปรไฟล์ (แก้ไขเพื่อรองรับ Cloud)
+// ส่วนจัดการอัปโหลด (แบบมีแจ้งเตือน Error)
 // ==========================================
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] == 0) {
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
-    // [แก้จุดที่ 1] ใช้ __DIR__ เพื่อระบุที่อยู่ไฟล์แบบ Absolute Path (จำเป็นมากบน Cloud/Linux)
-    $target_dir = __DIR__ . "/uploads/";
-    
-    // สร้างโฟลเดอร์ถ้ายังไม่มี
-    if (!is_dir($target_dir)) {
-        mkdir($target_dir, 0777, true);
+    // เช็คว่ามีการส่งไฟล์มาไหม
+    if (!isset($_FILES['profile_image']) || $_FILES['profile_image']['error'] == 4) {
+        // ไม่ได้เลือกไฟล์ ไม่ต้องทำอะไร
+    } 
+    // เช็ค Error จากฝั่ง Server (เช่น ไฟล์ใหญ่เกิน)
+    elseif ($_FILES['profile_image']['error'] != 0) {
+        $errorCode = $_FILES['profile_image']['error'];
+        $errorMsg = "เกิดข้อผิดพลาดในการอัปโหลด (รหัส: $errorCode)";
+        
+        if ($errorCode == 1) $errorMsg = "ไฟล์มีขนาดใหญ่เกินกำหนดของ Server (upload_max_filesize)";
+        elseif ($errorCode == 2) $errorMsg = "ไฟล์มีขนาดใหญ่เกินกำหนด (MAX_FILE_SIZE)";
+        
+        echo "<script>alert('$errorMsg'); window.location.href='account.php';</script>";
+        exit();
     }
-    
-    $file_extension = strtolower(pathinfo($_FILES["profile_image"]["name"], PATHINFO_EXTENSION));
-    $allowed_types = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-    
-    if (in_array($file_extension, $allowed_types)) {
+    // ถ้าไม่มี Error เริ่มกระบวนการย้ายไฟล์
+    else {
+        $target_dir = __DIR__ . "/uploads/";
         
-        // 📌 1. ค้นหาชื่อไฟล์รูปเก่าจากฐานข้อมูลก่อน
-        $old_image_name = "";
-        $findOldSql = "SELECT u_image FROM `user` WHERE u_id = ?";
-        if ($stmtOld = mysqli_prepare($conn, $findOldSql)) {
-            mysqli_stmt_bind_param($stmtOld, "i", $u_id);
-            mysqli_stmt_execute($stmtOld);
-            mysqli_stmt_bind_result($stmtOld, $old_image_name);
-            mysqli_stmt_fetch($stmtOld);
-            mysqli_stmt_close($stmtOld);
+        // สร้างโฟลเดอร์ถ้าไม่มี
+        if (!is_dir($target_dir)) {
+            mkdir($target_dir, 0777, true);
         }
-
-        // ตั้งชื่อไฟล์ใหม่ไม่ให้ซ้ำกัน
-        $new_filename = "profile_" . $u_id . "_" . time() . "." . $file_extension;
-        $target_file = $target_dir . $new_filename;
         
-        // 2. ทำการอัปโหลดไฟล์รูปลงโฟลเดอร์ (ใช้ Path เต็มจาก $target_dir)
-        if (move_uploaded_file($_FILES["profile_image"]["tmp_name"], $target_file)) {
+        $file_extension = strtolower(pathinfo($_FILES["profile_image"]["name"], PATHINFO_EXTENSION));
+        $allowed_types = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        
+        if (in_array($file_extension, $allowed_types)) {
             
-            // 📌 3. ถ้าอัปโหลดไฟล์ใหม่เข้าโฟลเดอร์สำเร็จ ให้สั่งลบไฟล์รูปเก่าทิ้ง!
-            if (!empty($old_image_name) && file_exists($target_dir . $old_image_name)) {
-                unlink($target_dir . $old_image_name); // คำสั่งลบไฟล์
+            // 1. หาชื่อรูปเก่า
+            $old_image_name = "";
+            $findOldSql = "SELECT u_image FROM `user` WHERE u_id = ?";
+            if ($stmtOld = mysqli_prepare($conn, $findOldSql)) {
+                mysqli_stmt_bind_param($stmtOld, "i", $u_id);
+                mysqli_stmt_execute($stmtOld);
+                mysqli_stmt_bind_result($stmtOld, $old_image_name);
+                mysqli_stmt_fetch($stmtOld);
+                mysqli_stmt_close($stmtOld);
             }
 
-            // 4. บันทึกชื่อรูปใหม่ลงฐานข้อมูล
-            $updateSql = "INSERT INTO `user` (u_id, u_image) VALUES (?, ?) ON DUPLICATE KEY UPDATE u_image = ?";
-            if ($updateStmt = mysqli_prepare($conn, $updateSql)) {
-                mysqli_stmt_bind_param($updateStmt, "iss", $u_id, $new_filename, $new_filename);
-                mysqli_stmt_execute($updateStmt);
-                mysqli_stmt_close($updateStmt);
+            // 2. ตั้งชื่อไฟล์ใหม่
+            $new_filename = "profile_" . $u_id . "_" . time() . "." . $file_extension;
+            $target_file = $target_dir . $new_filename;
+            
+            // 3. ย้ายไฟล์
+            if (move_uploaded_file($_FILES["profile_image"]["tmp_name"], $target_file)) {
+                
+                // ลบรูปเก่า
+                if (!empty($old_image_name) && file_exists($target_dir . $old_image_name)) {
+                    unlink($target_dir . $old_image_name);
+                }
+
+                // อัปเดต Database
+                $updateSql = "INSERT INTO `user` (u_id, u_image) VALUES (?, ?) ON DUPLICATE KEY UPDATE u_image = ?";
+                if ($updateStmt = mysqli_prepare($conn, $updateSql)) {
+                    mysqli_stmt_bind_param($updateStmt, "iss", $u_id, $new_filename, $new_filename);
+                    if(mysqli_stmt_execute($updateStmt)){
+                        // สำเร็จ! รีเฟรชหน้า
+                        echo "<script>alert('อัปโหลดรูปสำเร็จ!'); window.location.href='account.php';</script>";
+                        exit();
+                    } else {
+                        echo "<script>alert('Database Error: บันทึกข้อมูลไม่สำเร็จ'); window.location.href='account.php';</script>";
+                    }
+                    mysqli_stmt_close($updateStmt);
+                }
+            } else {
+                // เคสที่ย้ายไฟล์ไม่ได้ (มักเป็น Permission)
+                echo "<script>alert('Permission Error: ไม่สามารถเขียนไฟล์ลงโฟลเดอร์ uploads ได้\\nกรุณาเช็ค Permission (chmod 777)'); window.location.href='account.php';</script>";
+                exit();
             }
-            // รีเฟรชหน้าเพื่อแสดงรูปใหม่
-            header("Location: account.php");
+        } else {
+            echo "<script>alert('ประเภทไฟล์ไม่ถูกต้อง (ต้องเป็น jpg, png, gif, webp)'); window.location.href='account.php';</script>";
             exit();
         }
     }
