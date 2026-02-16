@@ -29,7 +29,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
             $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
             $main_img_name = "prod_" . $product_id . "_main." . $ext;
-            // 🛑 ต้องมั่นใจว่ามีโฟลเดอร์ uploads/products แล้ว
             move_uploaded_file($_FILES['main_image']['tmp_name'], "../uploads/products/" . $main_img_name);
             mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $product_id");
         }
@@ -104,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
 if (isset($_GET['toggle_status']) && isset($_GET['id'])) {
     $t_id = (int)$_GET['id'];
     $current = (int)$_GET['toggle_status'];
-    $new_status = $current === 1 ? 0 : 1; // สลับ 1 เป็น 0, 0 เป็น 1
+    $new_status = $current === 1 ? 0 : 1; 
     mysqli_query($conn, "UPDATE product SET status = $new_status WHERE p_id = $t_id");
     
     $_SESSION['success_msg'] = "อัปเดตสถานะสำเร็จ!";
@@ -279,14 +278,14 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                 </td>
                                 
                                 <td class="px-6 py-4 text-center">
-                                    <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
-                                        <input type="checkbox" onchange="window.location.href='?toggle_status=<?= $p['status'] ?>&id=<?= $p['p_id'] ?>'" <?= $p['status'] ? 'checked' : '' ?> class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 checked:border-primary border-gray-300 left-0 transition-all duration-300"/>
-                                        <label class="toggle-label block overflow-hidden h-5 rounded-full <?= $p['status'] ? 'bg-primary' : 'bg-gray-300' ?> cursor-pointer"></label>
-                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer justify-center">
+                                        <input type="checkbox" class="sr-only peer" onchange="window.location.href='?toggle_status=<?= $p['status'] ?>&id=<?= $p['p_id'] ?>'" <?= $p['status'] ? 'checked' : '' ?>>
+                                        <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                    </label>
                                 </td>
                                 
                                 <td class="px-6 py-4 text-right pr-8">
-                                    <button onclick="openEditModal(<?= $p['p_id'] ?>, '<?= htmlspecialchars($p['p_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($p['p_sku'], ENT_QUOTES) ?>', <?= $p['c_id'] ?>, <?= $p['p_price'] ?>, <?= $p['p_stock'] ?>, '<?= htmlspecialchars(str_replace(array("\r", "\n"), array('\r', '\n'), $p['p_detail'] ?? ''), ENT_QUOTES) ?>')" class="p-2 text-gray-400 hover:text-primary transition-colors"><span class="material-icons-round text-[20px]">edit</span></button>
+                                    <button onclick="openEditModal(<?= $p['p_id'] ?>, '<?= htmlspecialchars($p['p_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($p['p_sku'], ENT_QUOTES) ?>', <?= $p['c_id'] ?>, <?= $p['p_price'] ?>, <?= $p['p_stock'] ?>, '<?= htmlspecialchars(str_replace(array("\r", "\n"), array('\r', '\n'), $p['p_detail'] ?? ''), ENT_QUOTES) ?>', '<?= $img ?>')" class="p-2 text-gray-400 hover:text-primary transition-colors"><span class="material-icons-round text-[20px]">edit</span></button>
                                     <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="p-2 text-gray-400 hover:text-red-500 transition-colors"><span class="material-icons-round text-[20px]">delete</span></button>
                                 </td>
                             </tr>
@@ -306,7 +305,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
             <div>
                 <h2 class="text-2xl font-bold text-gray-800">เพิ่มสินค้าใหม่</h2>
             </div>
-            <button type="button" onclick="closeModal('addProductModal')" class="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors shadow-sm">
+            <button type="button" onclick="closeModal('addProductModal')" class="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 shadow-sm">
                 <span class="material-icons-round text-[20px]">close</span>
             </button>
         </div>
@@ -320,12 +319,15 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพหลัก (ปก)</label>
                     <div class="w-full aspect-square border-2 border-dashed border-pink-300 rounded-3xl bg-white flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group">
-                        <input type="file" name="main_image" id="mainImageInput" accept="image/*" required class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewMainImage(this, 'mainImagePreview', 'mainImagePlaceholder')">
+                        <input type="file" name="main_image" id="mainImageInput" accept="image/*" required class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewMainImage(this)">
                         <img id="mainImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="mainImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
                             <div class="w-16 h-16 bg-pink-100 text-primary rounded-full flex items-center justify-center mx-auto mb-2"><span class="material-icons-round text-3xl">add_photo_alternate</span></div>
                             <span class="text-sm font-bold text-primary">คลิกอัปโหลดรูปปก</span>
                         </div>
+                        <button type="button" id="removeMainImageBtn" onclick="removeMainImage(event)" class="hidden absolute top-2 right-2 z-20 w-8 h-8 bg-white/80 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
+                            <span class="material-icons-round text-[18px]">close</span>
+                        </button>
                     </div>
                 </div>
 
@@ -421,12 +423,16 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <div class="w-full md:w-1/3">
                     <label class="block text-xs font-bold text-gray-500 mb-2">เปลี่ยนรูปปก (ไม่บังคับ)</label>
                     <div class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-3xl bg-gray-50 flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group">
-                        <input type="file" name="main_image" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewMainImage(this, 'editImagePreview', 'editImagePlaceholder')">
+                        <input type="file" name="main_image" id="editMainImageInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewEditMainImage(this)">
                         <img id="editImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="editImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
                             <div class="w-12 h-12 bg-white text-gray-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm"><span class="material-icons-round text-2xl">upload</span></div>
-                            <span class="text-xs font-bold text-gray-500">อัปโหลดรูปใหม่</span>
+                            <span class="text-xs font-bold text-gray-500">คลิกเพื่อเปลี่ยนรูป</span>
                         </div>
+                        
+                        <button type="button" id="removeEditImageBtn" onclick="removeEditMainImage(event)" class="hidden absolute top-2 right-2 z-20 w-8 h-8 bg-white/80 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
+                            <span class="material-icons-round text-[18px]">close</span>
+                        </button>
                     </div>
                 </div>
 
@@ -485,17 +491,54 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    // 🟢 โยนข้อมูลเก่าเข้าช่องกรอกสำหรับแก้ไข
-    function openEditModal(id, name, sku, cid, price, stock, detail) {
+    // 🟢 โยนข้อมูลเก่าเข้าช่องกรอกสำหรับแก้ไข (รับค่ารูปภาพด้วย)
+    function openEditModal(id, name, sku, cid, price, stock, detail, imgUrl) {
         document.getElementById('edit_p_id').value = id;
         document.getElementById('edit_p_name').value = name;
         document.getElementById('edit_p_sku').value = sku;
         document.getElementById('edit_c_id').value = cid;
         document.getElementById('edit_p_price').value = price;
         document.getElementById('edit_p_stock').value = stock;
-        // จัดการขึ้นบรรทัดใหม่
         document.getElementById('edit_p_detail').value = detail.replace(/\\n/g, "\n").replace(/\\r/g, "\r");
+        
+        // จัดการโชว์รูปเก่า
+        document.getElementById('editMainImageInput').value = ''; 
+        if (imgUrl && !imgUrl.includes('placeholder')) {
+            document.getElementById('editImagePreview').src = imgUrl;
+            document.getElementById('editImagePreview').classList.remove('hidden');
+            document.getElementById('editImagePlaceholder').classList.add('hidden');
+            document.getElementById('removeEditImageBtn').classList.remove('hidden');
+        } else {
+            document.getElementById('editImagePreview').classList.add('hidden');
+            document.getElementById('editImagePlaceholder').classList.remove('hidden');
+            document.getElementById('removeEditImageBtn').classList.add('hidden');
+        }
+
         openModal('editProductModal');
+    }
+
+    // ฟังก์ชันเคลียร์รูปหน้าแก้ไข
+    function removeEditMainImage(event) {
+        event.preventDefault();
+        document.getElementById('editMainImageInput').value = ''; 
+        document.getElementById('editImagePreview').src = '';
+        document.getElementById('editImagePreview').classList.add('hidden');
+        document.getElementById('editImagePlaceholder').classList.remove('hidden');
+        document.getElementById('removeEditImageBtn').classList.add('hidden');
+    }
+
+    // พรีวิวรูปตอนแก้ไข
+    function previewEditMainImage(input) {
+        if (input.files && input.files[0]) {
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('editImagePreview').src = e.target.result;
+                document.getElementById('editImagePreview').classList.remove('hidden');
+                document.getElementById('editImagePlaceholder').classList.add('hidden');
+                document.getElementById('removeEditImageBtn').classList.remove('hidden');
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
     }
 
     function confirmDelete(id) {
@@ -514,20 +557,31 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
 
-    // Preview รูปหลัก (ใช้ได้ทั้ง Modal เพิ่มและแก้ไข)
-    function previewMainImage(input, previewId, placeholderId) {
+    // Preview รูปหลัก Modal เพิ่มสินค้า
+    function previewMainImage(input) {
         if (input.files && input.files[0]) {
             let reader = new FileReader();
             reader.onload = function(e) {
-                document.getElementById(previewId).src = e.target.result;
-                document.getElementById(previewId).classList.remove('hidden');
-                document.getElementById(placeholderId).classList.add('hidden');
+                document.getElementById('mainImagePreview').src = e.target.result;
+                document.getElementById('mainImagePreview').classList.remove('hidden');
+                document.getElementById('mainImagePlaceholder').classList.add('hidden');
+                document.getElementById('removeMainImageBtn').classList.remove('hidden');
             }
             reader.readAsDataURL(input.files[0]);
         }
     }
+    
+    // เคลียร์รูปหลัก Modal เพิ่มสินค้า
+    function removeMainImage(event) {
+        event.preventDefault(); 
+        document.getElementById('mainImageInput').value = '';
+        document.getElementById('mainImagePreview').src = '';
+        document.getElementById('mainImagePreview').classList.add('hidden');
+        document.getElementById('mainImagePlaceholder').classList.remove('hidden');
+        document.getElementById('removeMainImageBtn').classList.add('hidden');
+    }
 
-    // จัดการ Gallery รูปภาพไม่อั้น (เหมือนเดิมเป๊ะ)
+    // จัดการ Gallery รูปภาพไม่อั้น (คงเดิม)
     let galleryFilesArray = []; 
     const galleryInput = document.getElementById('galleryInput');
     const realGalleryInput = document.getElementById('realGalleryInput');
