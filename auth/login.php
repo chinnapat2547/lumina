@@ -73,6 +73,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     mysqli_close($conn);
 }
+if ($check_password_success) {
+
+    // 🟢 กรณีเป็น Admin
+    if ($row['role'] == 'admin') { 
+        $_SESSION['admin_id'] = $row['id'];
+        $_SESSION['role'] = 'admin';
+        
+        // ส่งไปหน้า Dashboard (หลังบ้าน)
+        header("Location: home.php"); 
+
+    } 
+    // 🔵 กรณีเป็น User
+    else { 
+        $_SESSION['u_id'] = $row['id'];
+        $_SESSION['role'] = 'user';
+        
+        // ส่งไปหน้า Home (หน้าขายของ)
+        header("Location: home.php"); 
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html class="light" lang="th">
