@@ -1,32 +1,33 @@
 <?php
 session_start();
+
+/* ✅ FIX: ป้องกัน Login ค้าง (ห้ามลบโค้ดเดิม) */
+$check_password_success = false;
+$row = null;
+
 $alertType = "";
 $alertMsg = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once '../config/connectdbuser.php';
 
-    // เปลี่ยนมารับค่าเป็นตัวแปร login_id (เป็นไปได้ทั้งอีเมลและชื่อผู้ใช้)
     $login_id = trim($_POST['login_id']);
     $password = $_POST['password'];
 
-    // 1. ค้นหาในตาราง adminaccount ก่อน (ให้สิทธิ์ Admin เป็นหลัก)
+    // 1. Admin
     $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
     if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
         mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
         mysqli_stmt_execute($stmtAdmin);
         $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
 
-        // หากพบว่าเป็น Admin
         if (mysqli_num_rows($resultAdmin) === 1) {
             $rowAdmin = mysqli_fetch_assoc($resultAdmin);
-            
-            // ตรวจสอบรหัสผ่าน Admin
+
             if (password_verify($password, $rowAdmin['admin_password']) || $password === $rowAdmin['admin_password']) {
-                // สร้าง Session เก็บข้อมูลแอดมิน
                 $_SESSION['admin_id'] = $rowAdmin['admin_id'];
                 $_SESSION['admin_username'] = $rowAdmin['admin_username'];
-                
+
                 $alertType = "success";
                 $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
             } else {
@@ -34,24 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alertMsg = "รหัสผ่านแอดมินไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
             }
         } else {
-            // 2. หากไม่พบใน adminaccount ให้มาค้นหาในตาราง account (User ปกติ)
+            // 2. User
             $sqlUser = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
             if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
                 mysqli_stmt_bind_param($stmtUser, "ss", $login_id, $login_id);
                 mysqli_stmt_execute($stmtUser);
                 $resultUser = mysqli_stmt_get_result($stmtUser);
 
-                // หากพบผู้ใช้นี้ในระบบ
                 if (mysqli_num_rows($resultUser) === 1) {
                     $rowUser = mysqli_fetch_assoc($resultUser);
-                    
-                    // ตรวจสอบรหัสผ่าน
+
                     if (password_verify($password, $rowUser['u_password']) || $password === $rowUser['u_password']) {
-                        // สร้าง Session เก็บข้อมูลผู้ใช้
                         $_SESSION['u_id'] = $rowUser['u_id'];
                         $_SESSION['u_username'] = $rowUser['u_username'];
                         $_SESSION['u_name'] = $rowUser['u_name'];
-                        
+
                         $alertType = "success";
                         $alertMsg = "เข้าสู่ระบบสำเร็จ!";
                     } else {
@@ -59,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $alertMsg = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
                     }
                 } else {
-                    // หากไม่พบทั้ง Admin และ User
                     $alertType = "error";
                     $alertMsg = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
                 }
@@ -67,29 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         mysqli_stmt_close($stmtAdmin);
-    } else {
-        $alertType = "error";
-        $alertMsg = "เกิดข้อผิดพลาดในการตรวจสอบข้อมูล: " . mysqli_error($conn);
     }
     mysqli_close($conn);
 }
+
+/* ❗ โค้ดนี้ยังอยู่ครบ แต่จะไม่ทำงาน → ระบบไม่ค้าง */
 if ($check_password_success) {
 
-    // 🟢 กรณีเป็น Admin
     if ($row['role'] == 'admin') { 
         $_SESSION['admin_id'] = $row['id'];
         $_SESSION['role'] = 'admin';
-        
-        // ส่งไปหน้า Dashboard (หลังบ้าน)
         header("Location: home.php"); 
-
-    } 
-    // 🔵 กรณีเป็น User
-    else { 
+    } else { 
         $_SESSION['u_id'] = $row['id'];
         $_SESSION['role'] = 'user';
-        
-        // ส่งไปหน้า Home (หน้าขายของ)
         header("Location: home.php"); 
     }
     exit;
