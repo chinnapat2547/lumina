@@ -63,12 +63,12 @@ if ($max_price > 0 && $max_price < 5000) {
     $types .= "d";
 }
 
-// 🟢 กรองหมวดหมู่: แก้ให้ค้นหาจาก c_id แทน p_category
+// 🟢 กรองหมวดหมู่: แก้ไขตรงนี้ ระบุ p.c_id เพื่อป้องกัน Ambiguous column
 if (!empty($selected_cats)) {
     $placeholders = implode(',', array_fill(0, count($selected_cats), '?'));
-    $where_clauses[] = "c_id IN ($placeholders)";
+    $where_clauses[] = "p.c_id IN ($placeholders)"; // แก้จาก c_id เป็น p.c_id
     foreach ($selected_cats as $cat) {
-        $params[] = (int)$cat; // ส่งเป็น Int เพราะ ID เป็นตัวเลข
+        $params[] = (int)$cat; 
         $types .= "i";
     }
 }
@@ -87,8 +87,8 @@ elseif ($sort_by === 'popular') $order_sql = "ORDER BY p_id ASC";
 $total_products = 0;
 $products = [];
 
-// คิวรีนับจำนวน
-$sqlCount = "SELECT COUNT(p_id) as total FROM `product` WHERE $where_sql";
+// คิวรีนับจำนวน (ต้อง Join เหมือนกันเพื่อให้เงื่อนไขถูกต้อง)
+$sqlCount = "SELECT COUNT(p.p_id) as total FROM `product` p LEFT JOIN `category` c ON p.c_id = c.c_id WHERE $where_sql";
 $stmtCount = mysqli_prepare($conn, $sqlCount);
 if ($types) {
     $stmtCount->bind_param($types, ...$params);
@@ -524,48 +524,71 @@ while($c = mysqli_fetch_assoc($resCat)) {
 <footer class="bg-white dark:bg-surface-dark py-10 border-t border-pink-50 dark:border-gray-800 mt-auto relative z-20">
     <div class="max-w-7xl mx-auto px-4 text-center">
         <div class="flex justify-center items-center mb-4 opacity-80">
-            <span class="text-primary material-icons-round text-3xl mr-2">spa</span>
-            <span class="font-display font-bold text-2xl text-gray-800 dark:text-white">Lumina Beauty</span>
+            <span class="text-primary material-icons-round text-4xl">spa</span>
+            <span class="ml-2 text-xl font-bold text-gray-800 dark:text-white">Lumina Beauty</span>
         </div>
-        <p class="text-gray-400 text-sm">© 2026 Lumina Beauty. All rights reserved.</p>
+        <p class="text-gray-500 dark:text-gray-400 text-sm">© 2024 Lumina Beauty. All rights reserved.</p>
     </div>
 </footer>
 
 <script>
-    if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
+    // Toggle Dark Mode
     function toggleTheme() {
-        const htmlEl = document.documentElement;
-        htmlEl.classList.toggle('dark');
-        localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
+        const html = document.documentElement;
+        if (html.classList.contains('dark')) {
+            html.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        } else {
+            html.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        }
+    }
+
+    // Check Local Storage for Theme
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
     }
 
     function applyFilters() {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('page');
-
-        // อ่านค่า search จากช่อง input ถ้างงว่าทำไมต้องเช็ค 2 รอบ คือป้องกันการพิมพ์ว่างๆ ครับ
-        const searchInput = document.querySelector('input[name="search"]');
-        if(searchInput && searchInput.value) url.searchParams.set('search', searchInput.value);
-        else url.searchParams.delete('search');
-
+        const search = document.getElementById('liveSearchInput').value;
         const sort = document.getElementById('sortSelect').value;
-        if(sort) url.searchParams.set('sort', sort);
-
-        const maxPrice = document.getElementById('priceRange').value;
-        url.searchParams.set('max_price', maxPrice);
-
-        url.searchParams.delete('category[]');
-        document.querySelectorAll('.cat-checkbox:checked').forEach(cb => {
-            url.searchParams.append('category[]', cb.value);
+        const max_price = document.getElementById('priceRange').value;
+        
+        const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
+        let cats = [];
+        checkboxes.forEach((cb) => {
+            cats.push('category[]=' + cb.value);
         });
+        const catString = cats.join('&');
 
-        window.location.href = url.toString();
+        let url = `products.php?search=${encodeURIComponent(search)}&sort=${sort}&max_price=${max_price}`;
+        if(catString) {
+            url += `&${catString}`;
+        }
+        window.location.href = url;
     }
 
-    function goToPage(pageNumber) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('page', pageNumber);
-        window.location.href = url.toString();
+    function goToPage(page) {
+        const search = document.getElementById('liveSearchInput').value;
+        const sort = document.getElementById('sortSelect').value;
+        const max_price = document.getElementById('priceRange').value;
+
+        const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
+        let cats = [];
+        checkboxes.forEach((cb) => {
+            cats.push('category[]=' + cb.value);
+        });
+        const catString = cats.join('&');
+
+        let url = `products.php?page=${page}&search=${encodeURIComponent(search)}&sort=${sort}&max_price=${max_price}`;
+        if(catString) {
+            url += `&${catString}`;
+        }
+        window.location.href = url;
     }
 </script>
-</body></html>
+
+</body>
+</html>
