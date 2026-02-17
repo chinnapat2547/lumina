@@ -30,6 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['admin_id'] = $rowAdmin['admin_id'];
                 $_SESSION['admin_username'] = $rowAdmin['admin_username'];
 
+                header("Location: ../home.php");
+                exit;
+
                 $alertType = "success";
                 $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
             } else {
@@ -51,6 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['u_id'] = $rowUser['u_id'];
                         $_SESSION['u_username'] = $rowUser['u_username'];
                         $_SESSION['u_name'] = $rowUser['u_name'];
+
+                        header("Location: ../home.php");
+                        exit;
 
                         $alertType = "success";
                         $alertMsg = "เข้าสู่ระบบสำเร็จ!";
