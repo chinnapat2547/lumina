@@ -1,6 +1,5 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ob_start();
 session_start();
 
 /* ✅ FIX: ป้องกัน Login ค้าง (ห้ามลบโค้ดเดิม) */
@@ -17,63 +16,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'];
 
     // 1. Admin
-    $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
-    if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
-        mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
-        mysqli_stmt_execute($stmtAdmin);
-        $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
+$sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
+if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
 
-        if (mysqli_num_rows($resultAdmin) === 1) {
-            $rowAdmin = mysqli_fetch_assoc($resultAdmin);
+    mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
+    mysqli_stmt_execute($stmtAdmin);
+    $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
 
-            if (password_verify($password, $rowAdmin['admin_password']) || $password === $rowAdmin['admin_password']) {
-                $_SESSION['admin_id'] = $rowAdmin['admin_id'];
-                $_SESSION['admin_username'] = $rowAdmin['admin_username'];
+    // ===== ADMIN FOUND =====
+    if (mysqli_num_rows($resultAdmin) === 1) {
 
-                header("Location: ../home.php");
-                exit;
+        $rowAdmin = mysqli_fetch_assoc($resultAdmin);
 
-                $alertType = "success";
-                $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
-            } else {
-                $alertType = "error";
-                $alertMsg = "รหัสผ่านแอดมินไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
-            }
+        if (
+            password_verify($password, $rowAdmin['admin_password']) ||
+            $password === $rowAdmin['admin_password']
+        ) {
+            // ✅ Admin login success
+            $_SESSION['admin_id'] = $rowAdmin['admin_id'];
+            $_SESSION['admin_username'] = $rowAdmin['admin_username'];
+
+            header("Location: ../home.php");
+            exit;
         } else {
-            // 2. User
-            $sqlUser = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
-            if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
-                mysqli_stmt_bind_param($stmtUser, "ss", $login_id, $login_id);
-                mysqli_stmt_execute($stmtUser);
-                $resultUser = mysqli_stmt_get_result($stmtUser);
+            $alertType = "error";
+            $alertMsg  = "รหัสผ่านแอดมินไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+        }
 
-                if (mysqli_num_rows($resultUser) === 1) {
-                    $rowUser = mysqli_fetch_assoc($resultUser);
+    } else {
 
-                    if (password_verify($password, $rowUser['u_password']) || $password === $rowUser['u_password']) {
-                        $_SESSION['u_id'] = $rowUser['u_id'];
-                        $_SESSION['u_username'] = $rowUser['u_username'];
-                        $_SESSION['u_name'] = $rowUser['u_name'];
+        // ===== CHECK USER =====
+        $sqlUser = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
+        if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
 
-                        header("Location: ../home.php");
-                        exit;
+            mysqli_stmt_bind_param($stmtUser, "ss", $login_id, $login_id);
+            mysqli_stmt_execute($stmtUser);
+            $resultUser = mysqli_stmt_get_result($stmtUser);
 
-                        $alertType = "success";
-                        $alertMsg = "เข้าสู่ระบบสำเร็จ!";
-                    } else {
-                        $alertType = "error";
-                        $alertMsg = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
-                    }
+            if (mysqli_num_rows($resultUser) === 1) {
+
+                $rowUser = mysqli_fetch_assoc($resultUser);
+
+                if (
+                    password_verify($password, $rowUser['u_password']) ||
+                    $password === $rowUser['u_password']
+                ) {
+                    // ✅ User login success
+                    $_SESSION['u_id']       = $rowUser['u_id'];
+                    $_SESSION['u_username'] = $rowUser['u_username'];
+                    $_SESSION['u_name']     = $rowUser['u_name'];
+
+                    header("Location: ../home.php");
+                    exit;
                 } else {
                     $alertType = "error";
-                    $alertMsg = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
+                    $alertMsg  = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
                 }
-                mysqli_stmt_close($stmtUser);
+
+            } else {
+                $alertType = "error";
+                $alertMsg  = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
             }
+
+            mysqli_stmt_close($stmtUser);
         }
-        mysqli_stmt_close($stmtAdmin);
     }
-    mysqli_close($conn);
+
+    mysqli_stmt_close($stmtAdmin);
+}
+
+mysqli_close($conn);
+
 }
 
 /* ❗ โค้ดนี้ยังอยู่ครบ แต่จะไม่ทำงาน → ระบบไม่ค้าง */
@@ -502,4 +515,5 @@ if ($check_password_success) {
 </script>
 
 </body>
+<?php ob_end_flush(); ?>
 </html>
