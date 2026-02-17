@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 session_start();
 
 /* ✅ FIX: ป้องกัน Login ค้าง (ห้ามลบโค้ดเดิม) */
@@ -287,7 +289,7 @@ if ($check_password_success) {
                 <p class="text-[#9a4c73] dark:text-[#dcbccc] text-base">กรุณากรอกข้อมูลเพื่อเข้าสู่ระบบ</p>
             </div>
 
-            <form id="loginForm" action="" class="flex flex-col gap-5 w-full" method="POST" novalidate onsubmit="return validateLoginForm(event)">
+            <form id="loginForm" action="<?php echo $_SERVER['PHP_SELF']; ?>" class="flex flex-col gap-5 w-full" method="POST" novalidate onsubmit="return validateLoginForm(event)">
                 <div class="flex flex-col gap-2 group">
                     <label class="text-sm font-semibold text-[#1b0d14] dark:text-[#f3e7ed] ml-1" for="login_id">อีเมล หรือ ชื่อผู้ใช้</label>
                     <div class="relative">
