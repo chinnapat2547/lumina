@@ -359,7 +359,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-    // 🟢 แก้ไข: เปลี่ยนการทำงานของฟังก์ชันนี้ให้ถูกต้อง
     function validateLoginForm(event) {
         const login_id = document.getElementById('login_id').value.trim();
         const password = document.getElementById('password').value;
