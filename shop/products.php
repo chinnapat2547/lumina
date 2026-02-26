@@ -227,7 +227,8 @@ while($c = mysqli_fetch_assoc($resCat)) {
 </div>
 
 <header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-8 relative z-50">
-    <div class="max-w-7xl mx-auto flex justify-between items-center h-12">
+    <div class="w-full px-6 md:px-10 lg:px-16"> 
+        <div class="flex justify-between items-center h-20 w-full">
         <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
             <span class="material-icons-round text-primary text-4xl">spa</span>
             <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>

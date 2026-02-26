@@ -218,8 +218,8 @@ $totalCartItems = 0;
 </div>
 
 <header class="sticky top-0 z-50 glass-panel shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-20">
+    <div class="w-full px-6 md:px-10 lg:px-16"> 
+        <div class="flex justify-between items-center h-20 w-full">
             <a href="../home.php" class="flex-shrink-0 flex items-center cursor-pointer group">
                 <span class="material-icons-round text-primary text-4xl">spa</span>
                 <span class="ml-2 text-2xl font-bold font-display text-primary tracking-wide">Lumina</span>
