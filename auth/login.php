@@ -2,10 +2,6 @@
 ob_start();
 session_start();
 
-/* ✅ FIX: ป้องกัน Login ค้าง */
-$check_password_success = false;
-$userRole = null; 
-
 $alertType = "";
 $alertMsg = "";
 
@@ -14,26 +10,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $login_id = trim($_POST['login_id']);
     $password = $_POST['password'];
+    
+    $is_admin_attempt = false; // ตัวแปรเช็คว่าพบชื่อนี้ในตารางแอดมินหรือไม่
 
-    // 1. ค้นหาในตาราง adminaccount ก่อน
-    $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_email` = ? OR `admin_username` = ?";
+    // 1. ค้นหาในตาราง adminaccount ก่อน (จากฐานข้อมูลมีแค่ admin_username)
+    $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_username` = ?";
     if ($stmtAdmin = mysqli_prepare($conn, $sqlAdmin)) {
-        mysqli_stmt_bind_param($stmtAdmin, "ss", $login_id, $login_id);
+        mysqli_stmt_bind_param($stmtAdmin, "s", $login_id);
         mysqli_stmt_execute($stmtAdmin);
         $resultAdmin = mysqli_stmt_get_result($stmtAdmin);
 
-        // หากพบว่าเป็น Admin
+        // หากพบชื่อนี้ในตาราง Admin
         if (mysqli_num_rows($resultAdmin) === 1) {
+            $is_admin_attempt = true; 
             $rowAdmin = mysqli_fetch_assoc($resultAdmin);
             
+            // ตรวจสอบรหัสผ่าน Admin
             if (password_verify($password, $rowAdmin['admin_password']) || $password === $rowAdmin['admin_password']) {
-                // ✅ Admin login success
                 $_SESSION['admin_id'] = $rowAdmin['admin_id'];
                 $_SESSION['admin_username'] = $rowAdmin['admin_username'];
                 $_SESSION['role'] = 'admin'; 
-
-                $check_password_success = true;
-                $userRole = 'admin';
                 
                 $alertType = "success";
                 $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
@@ -41,48 +37,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $alertType = "error";
                 $alertMsg = "รหัสผ่านแอดมินไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
             }
-        } else {
-            // 2. หากไม่พบใน admin ให้มาค้นหาในตาราง account (User ปกติ)
-            $sqlUser = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
-            if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
-                mysqli_stmt_bind_param($stmtUser, "ss", $login_id, $login_id);
-                mysqli_stmt_execute($stmtUser);
-                $resultUser = mysqli_stmt_get_result($stmtUser);
-
-                if (mysqli_num_rows($resultUser) === 1) {
-                    $rowUser = mysqli_fetch_assoc($resultUser);
-
-                    if (password_verify($password, $rowUser['u_password']) || $password === $rowUser['u_password']) {
-                        // ✅ User login success
-                        $_SESSION['u_id']       = $rowUser['u_id'];
-                        $_SESSION['u_username'] = $rowUser['u_username'];
-                        $_SESSION['u_name']     = $rowUser['u_name'];
-                        $_SESSION['role']       = 'user'; 
-
-                        $check_password_success = true;
-                        $userRole = 'user';
-
-                        $alertType = "success";
-                        $alertMsg  = "ยินดีต้อนรับ " . $rowUser['u_username'] . " เข้าสู่ระบบเรียบร้อยแล้ว";
-                    } else {
-                        $alertType = "error";
-                        $alertMsg  = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
-                    }
-                } else {
-                    $alertType = "error";
-                    $alertMsg  = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
-                }
-                mysqli_stmt_close($stmtUser);
-            }
         }
         mysqli_stmt_close($stmtAdmin);
+    }
+
+    // 2. ถ้าไม่ใช่ Admin ให้มาค้นหาในตาราง account (User ปกติ)
+    if (!$is_admin_attempt) {
+        $sqlUser = "SELECT * FROM `account` WHERE `u_email` = ? OR `u_username` = ?";
+        if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
+            mysqli_stmt_bind_param($stmtUser, "ss", $login_id, $login_id);
+            mysqli_stmt_execute($stmtUser);
+            $resultUser = mysqli_stmt_get_result($stmtUser);
+
+            // หากพบผู้ใช้นี้ในระบบ
+            if (mysqli_num_rows($resultUser) === 1) {
+                $rowUser = mysqli_fetch_assoc($resultUser);
+
+                // ตรวจสอบรหัสผ่าน User
+                if (password_verify($password, $rowUser['u_password']) || $password === $rowUser['u_password']) {
+                    $_SESSION['u_id']       = $rowUser['u_id'];
+                    $_SESSION['u_username'] = $rowUser['u_username'];
+                    $_SESSION['u_name']     = $rowUser['u_name'];
+                    $_SESSION['role']       = 'user'; 
+
+                    $alertType = "success";
+                    $alertMsg  = "ยินดีต้อนรับ " . $rowUser['u_username'] . " เข้าสู่ระบบเรียบร้อยแล้ว";
+                } else {
+                    $alertType = "error";
+                    $alertMsg  = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+                }
+            } else {
+                // หากไม่พบทั้ง Admin และ User
+                $alertType = "error";
+                $alertMsg  = "ไม่พบอีเมลหรือชื่อผู้ใช้นี้ในระบบ กรุณาสมัครสมาชิก";
+            }
+            mysqli_stmt_close($stmtUser);
+        }
     }
     
     mysqli_close($conn);
 }
-
-// ถ้าเข้าระบบสำเร็จ จะไม่ทำตรงนี้ แต่จะปล่อยให้สคริปต์ SweetAlert ด้านล่างทำงาน
-// แล้ว JavaScript จะเป็นคนพาไปหน้า home.php เอง
 ?>
 <!DOCTYPE html>
 <html class="light" lang="th">
