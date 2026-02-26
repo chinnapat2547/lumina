@@ -142,9 +142,9 @@ if (isset($u_id) && !$isAdmin) {
     </style>
 </head>
 <body class="font-sans bg-background-light dark:bg-background-dark text-text-main-light dark:text-text-main-dark transition-colors duration-300">
-<nav class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-pink-100 dark:border-gray-800">
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex justify-between items-center h-20 w-full">
+<nav class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-pink-100 dark:border-gray-800 font-prompt">
+    <div class="w-full px-4 md:px-10 lg:px-16"> 
+        <div class="flex justify-between items-center h-20 w-full">
         <div class="flex-shrink-0 flex items-center gap-2 cursor-pointer">
             <span class="material-icons-round text-primary text-4xl">spa</span>
             <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>

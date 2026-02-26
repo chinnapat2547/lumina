@@ -179,7 +179,8 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
 <body class="bg-gradient-to-br from-blue-50 via-white to-pink-50 dark:from-background-dark dark:to-gray-900 min-h-screen text-gray-800 dark:text-gray-100 font-display transition-colors duration-300">
 
 <header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-8 relative z-50">
-    <div class="w-full px-6 md:px-10 lg:px-16"> 
+    <div class="w-full px-4 md:px-10 lg:px-16"> 
+        <div class="flex justify-between items-center h-20 w-full">
         <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
             <span class="material-icons-round text-primary text-4xl">spa</span>
             <span class="font-bold text-2xl tracking-tight text-primary font-display">Lumina</span>
