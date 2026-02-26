@@ -128,7 +128,7 @@ if (isset($_SESSION['u_id'])) {
 
 <header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-0 relative z-50">
     <div class="w-full px-4 md:px-10 lg:px-16"> 
-        <div class="flex justify-between items-center h-15 w-full">
+        <div class="flex justify-between items-center h-10 w-full">
         <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
             <span class="material-icons-round text-primary text-4xl">spa</span>
             <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
