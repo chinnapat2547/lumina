@@ -466,7 +466,7 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                             ? "../uploads/products/" . $rec['p_image'] 
                             : "https://via.placeholder.com/400x400.png?text=No+Image";
             ?>
-            <a href="product_detail.php?id=<?= $rec['p_id'] ?>" class="bg-white dark:bg-surface-dark rounded-[2rem] p-4 shadow-sm hover:shadow-glow transition-all duration-300 group border border-gray-100 dark:border-gray-700 block relative hover:-translate-y-1">
+            <a href="productdetail.php?id=<?= $rec['p_id'] ?>" class="bg-white dark:bg-surface-dark rounded-[2rem] p-4 shadow-sm hover:shadow-glow transition-all duration-300 group border border-gray-100 dark:border-gray-700 block relative hover:-translate-y-1">
                 <div class="absolute top-6 right-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div class="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-400 flex items-center justify-center shadow-sm hover:text-primary">
                         <span class="material-icons-round text-[18px]">favorite_border</span>
