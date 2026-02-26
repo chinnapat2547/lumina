@@ -129,7 +129,7 @@ $stat_total = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM 
 $stat_out = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock = 0"))['c'];
 $stat_low = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock > 0 AND p_stock <= 10"))['c'];
 
-// โชว์แจ้งเตือนออเดอร์
+// โชว์แจ้งเตือนออเดอร์ (Sidebar)
 $today = date('Y-m-d');
 $newOrders = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(order_id) as c FROM orders WHERE DATE(created_at) = '$today'"))['c'] ?? 0;
 
@@ -143,108 +143,237 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>จัดการสินค้า - Lumina Beauty Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     tailwind.config = {
-        darkMode: "class",
         theme: {
             extend: {
-                colors: { primary: "#F43F85", "primary-light": "#fce7f3", "background-light": "#FFF5F7", "card-light": "#FFFFFF", "text-main": "#374151" },
-                fontFamily: { display: ["Prompt", "sans-serif"], body: ["Prompt", "sans-serif"] },
-                borderRadius: { DEFAULT: "1rem", "xl": "1.5rem", "2xl": "2rem" },
-                boxShadow: { "soft": "0 10px 40px -10px rgba(244, 63, 133, 0.15)" }
+                colors: {
+                    primary: "#ec2d88", 
+                    "primary-light": "#fce7f3",
+                    secondary: "#a855f7",
+                    "background-light": "#fff5f9", 
+                    "surface-white": "#ffffff",
+                    "text-main": "#1f2937",
+                    "text-muted": "#6b7280",
+                },
+                fontFamily: {
+                    sans: ["Prompt", "sans-serif"],
+                    display: ["Prompt", "sans-serif"]
+                },
+                borderRadius: {
+                    DEFAULT: "1rem", "lg": "1.5rem", "xl": "2rem", "2xl": "2.5rem"
+                },
+                boxShadow: {
+                    "soft": "0 4px 20px -2px rgba(236, 45, 136, 0.1)",
+                    "card": "0 2px 10px -2px rgba(0, 0, 0, 0.05)",
+                    "glow": "0 0 15px rgba(236, 45, 136, 0.3)"
+                }
             },
         },
     }
 </script>
 <style>
     body { font-family: 'Prompt', sans-serif; }
-    .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(244, 63, 133, 0.1); }
-    .nav-item-active { background-color: #F43F85; color: white; box-shadow: 0 4px 12px rgba(244, 63, 133, 0.3); }
-    .nav-item:hover:not(.nav-item-active) { background-color: #fce7f3; color: #F43F85; }
+    .sidebar-gradient { background: linear-gradient(180deg, #ffffff 0%, #fff5f9 100%); }
+    .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(236, 45, 136, 0.1); }
+    .nav-item-active { background-color: #ec2d88; color: white; box-shadow: 0 4px 12px rgba(236, 45, 136, 0.3); }
+    .nav-item:hover:not(.nav-item-active) { background-color: #fce7f3; color: #ec2d88; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #FBCFE8; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #ec2d88; }
+    /* Scrollbar Modal สี */
     .color-scroll::-webkit-scrollbar { width: 4px; }
     .color-scroll::-webkit-scrollbar-thumb { background: #fce7f3; border-radius: 4px; }
 </style>
 </head>
-<body class="bg-background-light text-text-main overflow-x-hidden">
+<body class="bg-background-light font-sans text-text-main antialiased overflow-x-hidden selection:bg-primary selection:text-white">
 <div class="flex min-h-screen w-full">
     
-    <aside class="hidden lg:flex flex-col w-72 h-screen sticky top-0 border-r border-primary/10 bg-white p-6 justify-between z-20">
+    <aside class="hidden lg:flex flex-col w-72 h-screen sticky top-0 border-r border-pink-100 sidebar-gradient p-6 justify-between z-20 shadow-sm">
         <div>
-            <div class="flex items-center gap-3 px-2 mb-10">
-                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <span class="material-icons-round text-3xl">spa</span>
-                </div>
-                <h1 class="text-2xl font-bold tracking-tight text-primary font-display">Lumina Admin</h1>
-            </div>
+            <a href="../home.php" class="flex items-center gap-2 px-2 mb-10 hover:opacity-80 transition-opacity cursor-pointer">
+                <span class="material-icons-round text-primary text-4xl">spa</span>
+                <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
+                <span class="text-xs font-bold text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full ml-1">Admin</span>
+            </a>
+            
             <nav class="flex flex-col gap-2">
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300" href="dashboard.php">
-                    <span class="material-icons-round">dashboard</span><span class="font-medium text-sm">ภาพรวม</span>
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="dashboard.php">
+                    <span class="material-icons-round group-hover:scale-110 transition-transform">dashboard</span>
+                    <span class="font-medium text-[15px]">ภาพรวมระบบ</span>
                 </a>
-                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300" href="#">
-                    <span class="material-icons-round">inventory_2</span><span class="font-bold text-sm">จัดการสินค้า</span>
+                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="#">
+                    <span class="material-icons-round">inventory_2</span>
+                    <span class="font-bold text-[15px]">จัดการสินค้า</span>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-gray-500 transition-all duration-300" href="manage_orders.php">
-                    <span class="material-icons-round">receipt_long</span><span class="font-medium text-sm">รายการสั่งซื้อ</span>
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_orders.php">
+                    <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
+                    <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
                     <?php if($newOrders > 0): ?>
-                        <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full"><?= $newOrders ?></span>
+                        <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newOrders ?></span>
                     <?php endif; ?>
                 </a>
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="#">
+                    <span class="material-icons-round group-hover:scale-110 transition-transform">group</span>
+                    <span class="font-medium text-[15px]">ข้อมูลลูกค้า</span>
+                </a>
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="#">
+                    <span class="material-icons-round group-hover:scale-110 transition-transform">settings</span>
+                    <span class="font-medium text-[15px]">ตั้งค่าระบบ</span>
+                </a>
             </nav>
+        </div>
+        
+        <div class="p-5 rounded-2xl bg-gradient-to-br from-pink-50 to-purple-50 border border-pink-100 flex items-center gap-3 shadow-sm">
+            <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary shadow-sm">
+                <span class="material-icons-round text-xl">support_agent</span>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-primary">ต้องการความช่วยเหลือ?</p>
+                <p class="text-xs text-text-muted">ติดต่อทีมพัฒนาระบบ</p>
+            </div>
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col min-w-0">
-        <header class="flex items-center justify-between px-6 py-4 lg:px-10 lg:py-6 glass-panel sticky top-0 z-10 border-b border-white/50">
-            <div class="hidden md:flex flex-1 max-w-md relative group">
-                <span class="material-icons-round absolute left-4 top-2.5 text-gray-400">search</span>
-                <input class="block w-full pl-12 pr-3 py-2.5 rounded-full border-none bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 outline-none" placeholder="ค้นหาสินค้า (ชื่อ, SKU)..." type="text"/>
+        <header class="flex items-center justify-between px-6 py-4 lg:px-10 lg:py-5 glass-panel sticky top-0 z-50">
+            <div class="flex items-center gap-4 lg:hidden">
+                <button class="p-2 text-text-main hover:bg-pink-50 rounded-xl transition-colors">
+                    <span class="material-icons-round">menu</span>
+                </button>
+                <span class="font-bold text-xl text-primary flex items-center gap-1"><span class="material-icons-round">spa</span> Lumina</span>
             </div>
-            <div class="flex items-center gap-4 ml-auto">
-                <img src="https://ui-avatars.com/api/?name=Admin&background=F43F85&color=fff" class="w-10 h-10 rounded-full shadow-sm">
+            
+            <div class="hidden md:flex flex-1 max-w-md relative group">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span class="material-icons-round text-gray-400 group-focus-within:text-primary transition-colors text-[20px]">search</span>
+                </div>
+                <input class="block w-full pl-12 pr-4 py-2.5 rounded-full border border-pink-100 bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 transition-all outline-none" placeholder="ค้นหาสินค้า (ชื่อ, รหัส, หมวดหมู่)..." type="text"/>
+            </div>
+            
+            <div class="flex items-center gap-4 lg:gap-6 ml-auto">
+                <button class="relative p-2.5 rounded-full bg-white text-gray-500 hover:text-primary hover:bg-pink-50 transition-colors shadow-sm border border-pink-50">
+                    <span class="material-icons-round text-[22px]">notifications</span>
+                    <span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                </button>
+                
+                <div class="relative group flex items-center">
+                    <?php 
+                        $adminName = $_SESSION['admin_username'] ?? 'Admin'; 
+                        $adminAvatar = "https://ui-avatars.com/api/?name=" . urlencode($adminName) . "&background=a855f7&color=fff";
+                    ?>
+                    <a href="#" class="block w-11 h-11 rounded-full bg-gradient-to-tr from-purple-400 to-indigo-400 p-[2px] shadow-sm hover:shadow-glow hover:scale-105 transition-all cursor-pointer">
+                        <div class="bg-white rounded-full p-[2px] w-full h-full">
+                            <img alt="Admin Profile" class="w-full h-full rounded-full object-cover" src="<?= $adminAvatar ?>"/>
+                        </div>
+                    </a>
+                    
+                    <div class="absolute right-0 hidden pt-4 top-full w-[300px] z-50 group-hover:block cursor-default">
+                        <div class="bg-white rounded-3xl shadow-soft border border-pink-100 overflow-hidden p-5 relative">
+                            
+                            <div class="text-center mb-4">
+                                <span class="text-sm font-bold text-purple-500 bg-purple-50 px-3 py-1 rounded-full">
+                                    Administrator Mode
+                                </span>
+                            </div>
+
+                            <div class="flex justify-center relative mb-3">
+                                <div class="rounded-full p-[3px] bg-purple-500 shadow-md">
+                                    <div class="bg-white rounded-full p-[2px] w-16 h-16">
+                                        <img src="<?= $adminAvatar ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center mb-6">
+                                <h3 class="text-[20px] font-bold text-gray-800">สวัสดี, คุณ <?= htmlspecialchars($adminName) ?></h3>
+                                <p class="text-xs text-gray-500 mt-1">ผู้จัดการระบบสูงสุด</p>
+                            </div>
+
+                            <div class="flex flex-col gap-3">
+                                <a href="#" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-purple-500">
+                                    <span class="material-icons-round text-[18px]">manage_accounts</span> จัดการบัญชี
+                                </a>
+                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[18px]">logout</span> ออกจากระบบ
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <div class="p-6 lg:p-10 flex flex-col gap-8 max-w-[1600px] mx-auto w-full">
+        <div class="p-6 lg:p-8 flex flex-col gap-8 max-w-[1600px] mx-auto w-full">
+            
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 class="text-3xl font-extrabold text-gray-800">จัดการสินค้า</h1>
+                    <h1 class="text-3xl font-extrabold text-gray-800 tracking-tight">จัดการสินค้าคงคลัง</h1>
+                    <p class="text-gray-500 font-medium mt-1 text-sm">เพิ่ม, แก้ไข, จัดการสต๊อก และกำหนดสถานะการขายสินค้า</p>
                 </div>
-                <button onclick="openModal('addProductModal')" class="bg-primary hover:bg-pink-600 text-white px-6 py-3 rounded-full font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 transition-transform transform hover:-translate-y-1">
+                <button onclick="openModal('addProductModal')" class="bg-primary hover:bg-pink-600 text-white px-6 py-3.5 rounded-full font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 transition-transform transform hover:-translate-y-1">
                     <span class="material-icons-round">add</span> เพิ่มสินค้าใหม่
                 </button>
             </div>
 
             <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                <div class="bg-white p-5 rounded-2xl shadow-soft border border-pink-50 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-primary"><span class="material-icons-round text-2xl">inventory_2</span></div>
-                    <div><p class="text-gray-500 text-xs font-bold">สินค้าทั้งหมด</p><h3 class="text-2xl font-bold text-gray-800"><?= $stat_total ?></h3></div>
+                <div class="bg-white p-6 rounded-3xl shadow-card hover:shadow-soft transition-all duration-300 border border-gray-100 group relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-pink-50 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
+                    <div class="relative z-10 flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-pink-100 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                            <span class="material-icons-round text-3xl">inventory_2</span>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-sm font-semibold">สินค้าทั้งหมด</p>
+                            <h3 class="text-3xl font-extrabold text-gray-800"><?= $stat_total ?></h3>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-white p-5 rounded-2xl shadow-soft border border-pink-50 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500"><span class="material-icons-round text-2xl">production_quantity_limits</span></div>
-                    <div><p class="text-gray-500 text-xs font-bold">สินค้าที่หมด</p><h3 class="text-2xl font-bold text-gray-800"><?= $stat_out ?></h3></div>
+                <div class="bg-white p-6 rounded-3xl shadow-card hover:shadow-soft transition-all duration-300 border border-gray-100 group relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-red-50 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
+                    <div class="relative z-10 flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors">
+                            <span class="material-icons-round text-3xl">production_quantity_limits</span>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-sm font-semibold">สินค้าที่หมด</p>
+                            <h3 class="text-3xl font-extrabold text-gray-800"><?= $stat_out ?></h3>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-white p-5 rounded-2xl shadow-soft border border-pink-50 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600"><span class="material-icons-round text-2xl">low_priority</span></div>
-                    <div><p class="text-gray-500 text-xs font-bold">สินค้าใกล้หมด</p><h3 class="text-2xl font-bold text-gray-800"><?= $stat_low ?></h3></div>
+                <div class="bg-white p-6 rounded-3xl shadow-card hover:shadow-soft transition-all duration-300 border border-gray-100 group relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-yellow-50 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out z-0"></div>
+                    <div class="relative z-10 flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-yellow-100 flex items-center justify-center text-yellow-600 group-hover:bg-yellow-500 group-hover:text-white transition-colors">
+                            <span class="material-icons-round text-3xl">low_priority</span>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-sm font-semibold">สินค้าใกล้หมด</p>
+                            <h3 class="text-3xl font-extrabold text-gray-800"><?= $stat_low ?></h3>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-3xl shadow-soft overflow-hidden border border-pink-50">
+            <div class="bg-white rounded-3xl shadow-card overflow-hidden border border-gray-100 mb-10">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                                <th class="px-6 py-4 font-bold pl-8">รูปภาพ</th>
-                                <th class="px-6 py-4 font-bold">ชื่อสินค้า / SKU</th>
-                                <th class="px-6 py-4 font-bold">หมวดหมู่</th>
-                                <th class="px-6 py-4 font-bold">ราคา</th>
-                                <th class="px-6 py-4 font-bold text-center">สต็อก</th>
-                                <th class="px-6 py-4 font-bold text-center">สถานะ</th>
-                                <th class="px-6 py-4 font-bold text-right pr-8">จัดการ</th>
+                            <tr class="bg-gray-50/80 text-gray-500 text-[13px] uppercase tracking-wider border-b border-gray-100">
+                                <th class="px-6 py-5 font-bold pl-8">รูปภาพ</th>
+                                <th class="px-6 py-5 font-bold">ชื่อสินค้า / SKU</th>
+                                <th class="px-6 py-5 font-bold">หมวดหมู่</th>
+                                <th class="px-6 py-5 font-bold">ราคา</th>
+                                <th class="px-6 py-5 font-bold text-center">สต็อก</th>
+                                <th class="px-6 py-5 font-bold text-center">สถานะ</th>
+                                <th class="px-6 py-5 font-bold text-right pr-8">จัดการ</th>
                             </tr>
                         </thead>
                         <tbody class="text-sm divide-y divide-gray-50">
@@ -253,27 +382,29 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                             ?>
                             <tr class="hover:bg-pink-50/30 transition-colors group">
                                 <td class="px-6 py-4 pl-8">
-                                    <img src="<?= $img ?>" class="w-14 h-14 rounded-xl object-cover border border-gray-100 shadow-sm">
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="flex flex-col">
-                                        <span class="font-bold text-gray-800 text-base"><?= htmlspecialchars($p['p_name']) ?></span>
-                                        <span class="text-xs text-gray-400">SKU: <?= htmlspecialchars($p['p_sku']) ?></span>
+                                    <div class="w-16 h-16 rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+                                        <img src="<?= $img ?>" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-pink-50 text-primary border border-pink-100">
+                                    <div class="flex flex-col">
+                                        <span class="font-bold text-gray-800 text-base mb-0.5 group-hover:text-primary transition-colors"><?= htmlspecialchars($p['p_name']) ?></span>
+                                        <span class="text-[12px] text-gray-400 font-mono bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">SKU: <?= htmlspecialchars($p['p_sku']) ?></span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-pink-50 text-primary border border-pink-100 shadow-sm">
                                         <?= htmlspecialchars($p['c_name'] ?? 'ไม่มีหมวดหมู่') ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 font-bold text-gray-800">฿<?= number_format($p['p_price']) ?></td>
+                                <td class="px-6 py-4 font-bold text-gray-800 text-base">฿<?= number_format($p['p_price']) ?></td>
                                 <td class="px-6 py-4 text-center">
                                     <?php if($p['p_stock'] == 0): ?>
-                                        <span class="font-bold text-red-500 bg-red-50 px-2 py-1 rounded-md text-xs">หมด</span>
+                                        <span class="font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg text-xs shadow-sm">สินค้าหมด</span>
                                     <?php elseif($p['p_stock'] <= 10): ?>
-                                        <span class="font-bold text-yellow-600"><?= $p['p_stock'] ?></span>
+                                        <span class="font-bold text-yellow-600 bg-yellow-50 px-3 py-1 rounded-lg text-xs shadow-sm">เหลือ <?= $p['p_stock'] ?></span>
                                     <?php else: ?>
-                                        <span class="font-bold text-green-500"><?= $p['p_stock'] ?></span>
+                                        <span class="font-bold text-green-600 bg-green-50 px-3 py-1 rounded-lg text-xs shadow-sm">พร้อมขาย (<?= $p['p_stock'] ?>)</span>
                                     <?php endif; ?>
                                 </td>
                                 
@@ -285,8 +416,8 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                 </td>
                                 
                                 <td class="px-6 py-4 text-right pr-8">
-                                    <button onclick="openEditModal(<?= $p['p_id'] ?>, '<?= htmlspecialchars($p['p_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($p['p_sku'], ENT_QUOTES) ?>', <?= $p['c_id'] ?>, <?= $p['p_price'] ?>, <?= $p['p_stock'] ?>, '<?= htmlspecialchars(str_replace(array("\r", "\n"), array('\r', '\n'), $p['p_detail'] ?? ''), ENT_QUOTES) ?>', '<?= $img ?>')" class="p-2 text-gray-400 hover:text-primary transition-colors"><span class="material-icons-round text-[20px]">edit</span></button>
-                                    <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="p-2 text-gray-400 hover:text-red-500 transition-colors"><span class="material-icons-round text-[20px]">delete</span></button>
+                                    <button onclick="openEditModal(<?= $p['p_id'] ?>, '<?= htmlspecialchars($p['p_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($p['p_sku'], ENT_QUOTES) ?>', <?= $p['c_id'] ?>, <?= $p['p_price'] ?>, <?= $p['p_stock'] ?>, '<?= htmlspecialchars(str_replace(array("\r", "\n"), array('\r', '\n'), $p['p_detail'] ?? ''), ENT_QUOTES) ?>', '<?= $img ?>')" class="w-9 h-9 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors inline-flex items-center justify-center mr-1"><span class="material-icons-round text-[20px]">edit</span></button>
+                                    <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="w-9 h-9 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex items-center justify-center"><span class="material-icons-round text-[20px]">delete</span></button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -299,13 +430,13 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 </div>
 
 <div id="addProductModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center opacity-0 transition-opacity duration-300 py-10">
-    <div class="bg-white rounded-[2rem] w-full max-w-5xl h-full max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300">
+    <div class="bg-white rounded-[2rem] w-full max-w-5xl h-full max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300 border border-white">
         
-        <div class="px-8 py-5 border-b border-pink-50 flex justify-between items-center bg-gray-50/50">
+        <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div>
-                <h2 class="text-2xl font-bold text-gray-800">เพิ่มสินค้าใหม่</h2>
+                <h2 class="text-2xl font-extrabold text-gray-800">เพิ่มสินค้าใหม่</h2>
             </div>
-            <button type="button" onclick="closeModal('addProductModal')" class="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 shadow-sm">
+            <button type="button" onclick="closeModal('addProductModal')" class="w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-colors shadow-sm">
                 <span class="material-icons-round text-[20px]">close</span>
             </button>
         </div>
@@ -313,19 +444,19 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         <form action="" method="POST" enctype="multipart/form-data" class="flex-1 overflow-hidden flex flex-col md:flex-row">
             <input type="hidden" name="action" value="add_product">
             
-            <div class="w-full md:w-2/5 p-8 border-r border-gray-100 bg-pink-50/30 overflow-y-auto">
-                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><span class="material-icons-round text-primary">collections</span> รูปภาพสินค้า</h3>
+            <div class="w-full md:w-2/5 p-8 border-r border-gray-100 bg-pink-50/30 overflow-y-auto color-scroll">
+                <h3 class="font-bold text-gray-800 mb-5 flex items-center gap-2 text-lg"><span class="material-icons-round text-primary bg-white p-1.5 rounded-xl shadow-sm">collections</span> รูปภาพสินค้า</h3>
                 
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพหลัก (ปก)</label>
-                    <div class="w-full aspect-square border-2 border-dashed border-pink-300 rounded-3xl bg-white flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group">
+                    <div class="w-full aspect-square border-2 border-dashed border-pink-300 rounded-3xl bg-white flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group shadow-sm">
                         <input type="file" name="main_image" id="mainImageInput" accept="image/*" required class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewMainImage(this)">
                         <img id="mainImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="mainImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
-                            <div class="w-16 h-16 bg-pink-100 text-primary rounded-full flex items-center justify-center mx-auto mb-2"><span class="material-icons-round text-3xl">add_photo_alternate</span></div>
+                            <div class="w-16 h-16 bg-pink-50 text-primary rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm"><span class="material-icons-round text-3xl">add_photo_alternate</span></div>
                             <span class="text-sm font-bold text-primary">คลิกอัปโหลดรูปปก</span>
                         </div>
-                        <button type="button" id="removeMainImageBtn" onclick="removeMainImage(event)" class="hidden absolute top-2 right-2 z-20 w-8 h-8 bg-white/80 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
+                        <button type="button" id="removeMainImageBtn" onclick="removeMainImage(event)" class="hidden absolute top-3 right-3 z-20 w-9 h-9 bg-white/90 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
                             <span class="material-icons-round text-[18px]">close</span>
                         </button>
                     </div>
@@ -334,11 +465,11 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <div class="mt-6">
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-xs font-bold text-gray-500">รูปภาพเพิ่มเติม (Gallery)</label>
-                        <span class="text-[10px] text-primary bg-pink-50 px-2 py-0.5 rounded-full font-bold">อัปโหลดได้ไม่จำกัด</span>
+                        <span class="text-[10px] text-primary bg-white px-2 py-1 border border-pink-100 rounded-full font-bold shadow-sm">อัปโหลดได้ไม่จำกัด</span>
                     </div>
                     
                     <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
-                        <label id="addGalleryBtn" class="aspect-square border-2 border-dashed border-pink-300 rounded-2xl bg-pink-50/50 flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-all text-primary/60 hover:bg-pink-50">
+                        <label id="addGalleryBtn" class="aspect-square border-2 border-dashed border-pink-300 rounded-2xl bg-white flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-all text-primary/60 hover:bg-pink-50 shadow-sm">
                             <span class="material-icons-round text-3xl">add_photo_alternate</span>
                             <span class="text-[10px] font-bold mt-1">เพิ่มรูป</span>
                             <input type="file" multiple accept="image/*" class="hidden" id="galleryInput">
@@ -348,22 +479,22 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 </div>
             </div>
 
-            <div class="w-full md:w-3/5 p-8 overflow-y-auto color-scroll pb-20">
-                <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2"><span class="material-icons-round text-primary">description</span> รายละเอียดทั่วไป</h3>
+            <div class="w-full md:w-3/5 p-8 overflow-y-auto color-scroll pb-24 relative bg-white">
+                <h3 class="font-bold text-gray-800 mb-5 flex items-center gap-2 text-lg"><span class="material-icons-round text-blue-500 bg-blue-50 p-1.5 rounded-xl shadow-sm">description</span> รายละเอียดทั่วไป</h3>
                 <div class="space-y-5">
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ชื่อสินค้า <span class="text-red-500">*</span></label>
-                        <input type="text" name="p_name" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all">
+                        <input type="text" name="p_name" required placeholder="เช่น เซรั่มหน้าใส Lumina Glow" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all shadow-sm">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">รหัสสินค้า (SKU)</label>
-                            <input type="text" name="p_sku" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-mono text-sm">
+                            <input type="text" name="p_sku" placeholder="LM-001" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-mono text-sm shadow-sm">
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">หมวดหมู่ <span class="text-red-500">*</span></label>
-                            <select name="c_id" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all appearance-none">
-                                <option value="">เลือก...</option>
+                            <select name="c_id" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all appearance-none shadow-sm cursor-pointer">
+                                <option value="">เลือกหมวดหมู่...</option>
                                 <?php foreach($categories as $c): ?>
                                     <option value="<?= $c['c_id'] ?>"><?= $c['c_name'] ?></option>
                                 <?php endforeach; ?>
@@ -373,82 +504,84 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ราคา (บาท) <span class="text-red-500">*</span></label>
-                            <input type="number" name="p_price" required min="0" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-bold text-primary">
+                            <div class="relative">
+                                <span class="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
+                                <input type="number" name="p_price" required min="0" placeholder="0.00" class="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-bold text-primary shadow-sm">
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">สต็อก <span class="text-red-500">*</span></label>
-                            <input type="number" name="p_stock" required min="0" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all">
+                            <input type="number" name="p_stock" required min="0" placeholder="0" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all shadow-sm">
                         </div>
                     </div>
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">รายละเอียด</label>
-                        <textarea name="p_detail" rows="3" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all resize-none"></textarea>
+                        <textarea name="p_detail" rows="4" placeholder="กรอกคุณสมบัติ, วิธีใช้, ส่วนผสม..." class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all resize-none shadow-sm"></textarea>
                     </div>
 
-                    <div class="pt-4 border-t border-gray-100">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="font-bold text-gray-700 flex items-center gap-2"><span class="material-icons-round text-purple-500">palette</span> ตัวเลือกสี</h3>
-                            <button type="button" onclick="addColorRow()" class="text-xs bg-purple-50 text-purple-600 font-bold px-3 py-1.5 rounded-full hover:bg-purple-100 flex items-center gap-1 transition-colors">
-                                <span class="material-icons-round text-[14px]">add</span> เพิ่มสี
+                    <div class="pt-5 border-t border-gray-100">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg"><span class="material-icons-round text-purple-500 bg-purple-50 p-1.5 rounded-xl shadow-sm">palette</span> ตัวเลือกสี</h3>
+                            <button type="button" onclick="addColorRow()" class="text-xs bg-white border border-purple-200 text-purple-600 font-bold px-4 py-2 rounded-full hover:bg-purple-50 hover:border-purple-300 flex items-center gap-1 transition-all shadow-sm">
+                                <span class="material-icons-round text-[16px]">add</span> เพิ่มสี
                             </button>
                         </div>
-                        <div id="colorContainer" class="space-y-2"></div>
+                        <div id="colorContainer" class="space-y-3"></div>
                     </div>
                 </div>
             </div>
             
-            <div class="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 flex justify-end gap-3 rounded-b-[2rem] z-10">
-                <button type="button" onclick="closeModal('addProductModal')" class="px-8 py-3 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
-                <button type="submit" class="px-8 py-3 rounded-full bg-primary text-white font-bold hover:bg-pink-600 shadow-lg shadow-primary/30 transition-all transform hover:-translate-y-0.5">บันทึกสินค้า</button>
+            <div class="absolute bottom-0 left-0 right-0 p-5 bg-white/90 backdrop-blur-md border-t border-gray-100 flex justify-end gap-3 rounded-b-[2rem] z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
+                <button type="button" onclick="closeModal('addProductModal')" class="px-8 py-3 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors border border-gray-200">ยกเลิก</button>
+                <button type="submit" class="px-8 py-3 rounded-full bg-primary text-white font-bold hover:bg-pink-600 shadow-lg shadow-primary/40 transition-all transform hover:-translate-y-0.5">บันทึกสินค้าใหม่</button>
             </div>
         </form>
     </div>
 </div>
 
 <div id="editProductModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center opacity-0 transition-opacity duration-300 py-10">
-    <div class="bg-white rounded-[2rem] w-full max-w-4xl h-auto max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300">
+    <div class="bg-white rounded-[2rem] w-full max-w-4xl h-auto max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300 border border-white">
         
-        <div class="px-8 py-5 border-b border-pink-50 flex justify-between items-center bg-gray-50/50">
-            <h2 class="text-2xl font-bold text-gray-800">แก้ไขข้อมูลสินค้า</h2>
-            <button type="button" onclick="closeModal('editProductModal')" class="w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 shadow-sm">
+        <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h2 class="text-2xl font-extrabold text-gray-800 flex items-center gap-2"><span class="material-icons-round text-blue-500">edit_note</span> แก้ไขข้อมูลสินค้า</h2>
+            <button type="button" onclick="closeModal('editProductModal')" class="w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 shadow-sm transition-colors">
                 <span class="material-icons-round text-[20px]">close</span>
             </button>
         </div>
 
-        <form action="" method="POST" enctype="multipart/form-data" class="flex-1 overflow-y-auto p-8 color-scroll pb-24">
+        <form action="" method="POST" enctype="multipart/form-data" class="flex-1 overflow-y-auto p-8 color-scroll pb-28 bg-white">
             <input type="hidden" name="action" value="edit_product">
             <input type="hidden" name="edit_p_id" id="edit_p_id">
             
             <div class="flex flex-col md:flex-row gap-8">
                 <div class="w-full md:w-1/3">
-                    <label class="block text-xs font-bold text-gray-500 mb-2">เปลี่ยนรูปปก (ไม่บังคับ)</label>
-                    <div class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-3xl bg-gray-50 flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group">
+                    <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">เปลี่ยนรูปปก (ไม่บังคับ)</label>
+                    <div class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-3xl bg-gray-50 flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group shadow-sm">
                         <input type="file" name="main_image" id="editMainImageInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewEditMainImage(this)">
                         <img id="editImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="editImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
-                            <div class="w-12 h-12 bg-white text-gray-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm"><span class="material-icons-round text-2xl">upload</span></div>
-                            <span class="text-xs font-bold text-gray-500">คลิกเพื่อเปลี่ยนรูป</span>
+                            <div class="w-14 h-14 bg-white text-gray-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm border border-gray-100"><span class="material-icons-round text-2xl">upload</span></div>
+                            <span class="text-xs font-bold text-gray-500">คลิกอัปโหลดรูปใหม่</span>
                         </div>
-                        
-                        <button type="button" id="removeEditImageBtn" onclick="removeEditMainImage(event)" class="hidden absolute top-2 right-2 z-20 w-8 h-8 bg-white/80 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
+                        <button type="button" id="removeEditImageBtn" onclick="removeEditMainImage(event)" class="hidden absolute top-3 right-3 z-20 w-9 h-9 bg-white/90 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
                             <span class="material-icons-round text-[18px]">close</span>
                         </button>
                     </div>
                 </div>
 
-                <div class="w-full md:w-2/3 space-y-4">
+                <div class="w-full md:w-2/3 space-y-5">
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1 ml-1">ชื่อสินค้า</label>
-                        <input type="text" name="p_name" id="edit_p_name" required class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none">
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ชื่อสินค้า</label>
+                        <input type="text" name="p_name" id="edit_p_name" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all shadow-sm">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1 ml-1">รหัสสินค้า</label>
-                            <input type="text" name="p_sku" id="edit_p_sku" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none font-mono text-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">รหัสสินค้า</label>
+                            <input type="text" name="p_sku" id="edit_p_sku" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-mono text-sm shadow-sm">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1 ml-1">หมวดหมู่</label>
-                            <select name="c_id" id="edit_c_id" required class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none">
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">หมวดหมู่</label>
+                            <select name="c_id" id="edit_c_id" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all appearance-none shadow-sm cursor-pointer">
                                 <?php foreach($categories as $c): ?>
                                     <option value="<?= $c['c_id'] ?>"><?= $c['c_name'] ?></option>
                                 <?php endforeach; ?>
@@ -457,24 +590,27 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1 ml-1">ราคา (บาท)</label>
-                            <input type="number" name="p_price" id="edit_p_price" required min="0" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none text-primary font-bold">
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ราคา (บาท)</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
+                                <input type="number" name="p_price" id="edit_p_price" required min="0" class="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-bold text-primary shadow-sm">
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1 ml-1">สต็อก</label>
-                            <input type="number" name="p_stock" id="edit_p_stock" required min="0" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none">
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">สต็อก</label>
+                            <input type="number" name="p_stock" id="edit_p_stock" required min="0" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all shadow-sm">
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1 ml-1">รายละเอียด</label>
-                        <textarea name="p_detail" id="edit_p_detail" rows="4" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none resize-none"></textarea>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">รายละเอียด</label>
+                        <textarea name="p_detail" id="edit_p_detail" rows="4" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all resize-none shadow-sm"></textarea>
                     </div>
                 </div>
             </div>
 
-            <div class="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 flex justify-end gap-3 rounded-b-[2rem] z-10">
-                <button type="button" onclick="closeModal('editProductModal')" class="px-8 py-3 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
-                <button type="submit" class="px-8 py-3 rounded-full bg-primary text-white font-bold hover:bg-pink-600 shadow-lg shadow-primary/30 transition-all">บันทึกการเปลี่ยนแปลง</button>
+            <div class="absolute bottom-0 left-0 right-0 p-5 bg-white/90 backdrop-blur-md border-t border-gray-100 flex justify-end gap-3 rounded-b-[2rem] z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.02)]">
+                <button type="button" onclick="closeModal('editProductModal')" class="px-8 py-3 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors border border-gray-200">ยกเลิก</button>
+                <button type="submit" class="px-8 py-3 rounded-full bg-blue-500 text-white font-bold hover:bg-blue-600 shadow-lg shadow-blue-500/40 transition-all transform hover:-translate-y-0.5">บันทึกการเปลี่ยนแปลง</button>
             </div>
         </form>
     </div>
@@ -491,7 +627,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    // 🟢 โยนข้อมูลเก่าเข้าช่องกรอกสำหรับแก้ไข (รับค่ารูปภาพด้วย)
+    // โยนข้อมูลเก่าเข้าช่องกรอกสำหรับแก้ไข
     function openEditModal(id, name, sku, cid, price, stock, detail, imgUrl) {
         document.getElementById('edit_p_id').value = id;
         document.getElementById('edit_p_name').value = name;
@@ -501,7 +637,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         document.getElementById('edit_p_stock').value = stock;
         document.getElementById('edit_p_detail').value = detail.replace(/\\n/g, "\n").replace(/\\r/g, "\r");
         
-        // จัดการโชว์รูปเก่า
         document.getElementById('editMainImageInput').value = ''; 
         if (imgUrl && !imgUrl.includes('placeholder')) {
             document.getElementById('editImagePreview').src = imgUrl;
@@ -517,7 +652,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         openModal('editProductModal');
     }
 
-    // ฟังก์ชันเคลียร์รูปหน้าแก้ไข
     function removeEditMainImage(event) {
         event.preventDefault();
         document.getElementById('editMainImageInput').value = ''; 
@@ -527,7 +661,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         document.getElementById('removeEditImageBtn').classList.add('hidden');
     }
 
-    // พรีวิวรูปตอนแก้ไข
     function previewEditMainImage(input) {
         if (input.files && input.files[0]) {
             let reader = new FileReader();
@@ -543,8 +676,8 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 
     function confirmDelete(id) {
         Swal.fire({
-            title: 'ลบสินค้านี้?', text: "ข้อมูลสินค้า รูปภาพ และสี จะถูกลบทิ้งทั้งหมด!", icon: 'warning',
-            showCancelButton: true, confirmButtonColor: '#F43F85', cancelButtonColor: '#9CA3AF',
+            title: 'ยืนยันการลบ?', text: "สินค้านี้และรูปภาพทั้งหมดจะถูกลบถาวร!", icon: 'warning',
+            showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#9CA3AF',
             confirmButtonText: 'ลบเลย!', cancelButtonText: 'ยกเลิก',
             customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-full px-6', cancelButton: 'rounded-full px-6' }
         }).then((result) => {
@@ -553,11 +686,10 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     }
 
     <?php if (isset($_SESSION['success_msg'])): ?>
-        Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $_SESSION['success_msg'] ?>', confirmButtonColor: '#F43F85', customClass: { popup: 'rounded-3xl' }});
+        Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $_SESSION['success_msg'] ?>', confirmButtonColor: '#ec2d88', customClass: { popup: 'rounded-3xl' }});
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
 
-    // Preview รูปหลัก Modal เพิ่มสินค้า
     function previewMainImage(input) {
         if (input.files && input.files[0]) {
             let reader = new FileReader();
@@ -571,7 +703,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         }
     }
     
-    // เคลียร์รูปหลัก Modal เพิ่มสินค้า
     function removeMainImage(event) {
         event.preventDefault(); 
         document.getElementById('mainImageInput').value = '';
@@ -581,64 +712,68 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         document.getElementById('removeMainImageBtn').classList.add('hidden');
     }
 
-    // จัดการ Gallery รูปภาพไม่อั้น (คงเดิม)
-    let galleryFilesArray = []; 
+    // จัดการ Gallery อัปโหลดหลายรูปไม่ค้าง 100%
+    let galleryDataTransfer = new DataTransfer(); 
     const galleryInput = document.getElementById('galleryInput');
     const realGalleryInput = document.getElementById('realGalleryInput');
     const container = document.getElementById('galleryPreviewContainer');
     const addBtn = document.getElementById('addGalleryBtn');
 
     if (galleryInput) {
-        galleryInput.addEventListener('change', function() {
-            const files = this.files;
+        galleryInput.addEventListener('change', function(e) {
+            const files = e.target.files;
             if (files.length > 0) {
-                Array.from(files).forEach(file => { galleryFilesArray.push(file); });
-                updateGalleryUI();
-                updateRealInput();
+                for (let i = 0; i < files.length; i++) {
+                    galleryDataTransfer.items.add(files[i]);
+                }
+                refreshGalleryUI();
             }
             this.value = ''; 
         });
     }
 
-    function updateGalleryUI() {
-        document.querySelectorAll('.gallery-preview-item').forEach(el => el.remove());
-        galleryFilesArray.forEach((file, index) => {
+    function refreshGalleryUI() {
+        container.querySelectorAll('.gallery-preview-item').forEach(el => el.remove());
+        const files = galleryDataTransfer.files;
+        
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             const objectUrl = URL.createObjectURL(file);
-            let div = document.createElement('div');
-            div.className = 'gallery-preview-item aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group';
+            
+            const div = document.createElement('div');
+            div.className = 'gallery-preview-item aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group bg-white';
             div.innerHTML = `
-                <img src="${objectUrl}" class="w-full h-full object-cover">
-                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button type="button" onclick="removeGalleryImage(${index})" class="w-8 h-8 bg-white text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors transform hover:scale-110 shadow-md">
+                <img src="${objectUrl}" class="w-full h-full object-cover" onload="URL.revokeObjectURL(this.src)">
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                    <button type="button" onclick="removeGalleryImage(${i})" class="w-9 h-9 bg-white text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors transform hover:scale-110 shadow-md">
                         <span class="material-icons-round text-[18px]">delete</span>
                     </button>
                 </div>
             `;
             container.insertBefore(div, addBtn);
-        });
+        }
+        if (realGalleryInput) realGalleryInput.files = galleryDataTransfer.files;
     }
 
-    function removeGalleryImage(index) {
-        galleryFilesArray.splice(index, 1);
-        updateGalleryUI();
-        updateRealInput();
-    }
-
-    function updateRealInput() {
-        const dataTransfer = new DataTransfer();
-        galleryFilesArray.forEach(file => { dataTransfer.items.add(file); });
-        realGalleryInput.files = dataTransfer.files;
+    window.removeGalleryImage = function(indexToRemove) {
+        const newDt = new DataTransfer();
+        const files = galleryDataTransfer.files;
+        for (let i = 0; i < files.length; i++) {
+            if (i !== indexToRemove) newDt.items.add(files[i]);
+        }
+        galleryDataTransfer = newDt;
+        refreshGalleryUI();
     }
 
     let colorIndex = 1;
     function addColorRow() {
         const colorContainer = document.getElementById('colorContainer');
         const row = document.createElement('div');
-        row.className = 'flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-xl shadow-sm animate-fade-in-up';
+        row.className = 'flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-purple-300 transition-colors';
         row.innerHTML = `
-            <input type="color" name="color_hexes[]" value="#F43F85" class="w-10 h-10 rounded-lg cursor-pointer border-0 p-0 bg-transparent flex-shrink-0">
-            <input type="text" name="color_names[]" placeholder="ชื่อสี เช่น #01 W -'Bout to slay" class="flex-1 bg-transparent border-none text-sm focus:ring-0 outline-none p-0 text-gray-700">
-            <button type="button" onclick="this.parentElement.remove()" class="w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors flex-shrink-0">
+            <input type="color" name="color_hexes[]" value="#ec2d88" class="w-12 h-12 rounded-xl cursor-pointer border-0 p-0 bg-transparent flex-shrink-0 shadow-sm">
+            <input type="text" name="color_names[]" placeholder="ชื่อสี เช่น #01 W -'Bout to slay" class="flex-1 bg-transparent border-none text-sm focus:ring-0 outline-none p-0 text-gray-700 font-medium ml-2">
+            <button type="button" onclick="this.parentElement.remove()" class="w-9 h-9 rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors flex-shrink-0 mr-1">
                 <span class="material-icons-round text-[18px]">close</span>
             </button>
         `;

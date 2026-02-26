@@ -2,16 +2,93 @@
 ob_start();
 session_start();
 
+// เรียกใช้ไฟล์เชื่อมต่อฐานข้อมูล
+require_once '../config/connectdbuser.php';
+
+// ==========================================
+// ส่วนสำหรับ Navbar: ตั้งค่าตัวแปรเริ่มต้น
+// ==========================================
+$isLoggedIn = false;
+$isAdmin = false;
+$userData = [
+    'u_username' => 'ผู้เยี่ยมชม',
+    'u_email' => 'กรุณาเข้าสู่ระบบเพื่อใช้งาน'
+];
+$profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
+
+if (isset($_SESSION['admin_id'])) {
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $admin_id = $_SESSION['admin_id'];
+
+    $sqlAdminNav = "SELECT * FROM `adminaccount` WHERE `admin_id` = ?";
+    if ($stmtNav = mysqli_prepare($conn, $sqlAdminNav)) {
+        mysqli_stmt_bind_param($stmtNav, "i", $admin_id);
+        mysqli_stmt_execute($stmtNav);
+        $resultNav = mysqli_stmt_get_result($stmtNav);
+        if ($rowNav = mysqli_fetch_assoc($resultNav)) {
+            $userData['u_username'] = $rowNav['admin_username'];
+            $userData['u_email'] = 'Administrator Mode';
+            $profileImage = "https://ui-avatars.com/api/?name=Admin&background=a855f7&color=fff";
+        }
+        mysqli_stmt_close($stmtNav);
+    }
+} elseif (isset($_SESSION['u_id'])) {
+    $isLoggedIn = true;
+    $u_id_nav = $_SESSION['u_id'];
+    
+    $sqlUserNav = "SELECT a.*, u.u_image, u.u_gender 
+            FROM `account` a 
+            LEFT JOIN `user` u ON a.u_id = u.u_id 
+            WHERE a.u_id = ?";
+            
+    if ($stmtNav = mysqli_prepare($conn, $sqlUserNav)) {
+        mysqli_stmt_bind_param($stmtNav, "i", $u_id_nav);
+        mysqli_stmt_execute($stmtNav);
+        $resultNav = mysqli_stmt_get_result($stmtNav);
+        if ($rowNav = mysqli_fetch_assoc($resultNav)) {
+            $userData = $rowNav;
+            
+            $displayName = $userData['u_username'] ?? 'ผู้ใช้งาน';
+            if (!empty($userData['u_image']) && file_exists("../profile/uploads/" . $userData['u_image'])) {
+                $profileImage = "../profile/uploads/" . $userData['u_image'];
+            } else {
+                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($displayName) . "&background=F43F85&color=fff";
+            }
+        }
+        mysqli_stmt_close($stmtNav);
+    }
+}
+
+$totalCartItems = 0;
+if (isset($u_id_nav) && !$isAdmin) {
+    $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
+    if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
+        mysqli_stmt_bind_param($stmtCartCount, "i", $u_id_nav);
+        mysqli_stmt_execute($stmtCartCount);
+        $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
+        if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
+            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
+        }
+        mysqli_stmt_close($stmtCartCount);
+    }
+}
+
+// ==========================================
+// ส่วนของการล็อกอิน (Login Logic)
+// ==========================================
+/* ✅ FIX: ป้องกัน Login ค้าง */
+$check_password_success = false;
+$userRole = null; 
+
 $alertType = "";
 $alertMsg = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once '../config/connectdbuser.php';
-
     $login_id = trim($_POST['login_id']);
     $password = $_POST['password'];
-    
-    $is_admin_attempt = false; // ตัวแปรเช็คว่าพบชื่อนี้ในตารางแอดมินหรือไม่
+
+    $is_admin_attempt = false; 
 
     // 1. ค้นหาในตาราง adminaccount ก่อน (จากฐานข้อมูลมีแค่ admin_username)
     $sqlAdmin = "SELECT * FROM `adminaccount` WHERE `admin_username` = ?";
@@ -31,6 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['admin_username'] = $rowAdmin['admin_username'];
                 $_SESSION['role'] = 'admin'; 
                 
+                $check_password_success = true;
+                $userRole = 'admin';
+
                 $alertType = "success";
                 $alertMsg = "เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!";
             } else {
@@ -60,6 +140,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['u_name']     = $rowUser['u_name'];
                     $_SESSION['role']       = 'user'; 
 
+                    $check_password_success = true;
+                    $userRole = 'user';
+
                     $alertType = "success";
                     $alertMsg  = "ยินดีต้อนรับ " . $rowUser['u_username'] . " เข้าสู่ระบบเรียบร้อยแล้ว";
                 } else {
@@ -86,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <title>เข้าสู่ระบบ LuminaBeauty</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -107,7 +191,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "surface-dark": "#2d1622",
                     },
                     fontFamily: {
-                        "display": ["Plus Jakarta Sans", "sans-serif"]
+                        "display": ["Plus Jakarta Sans", "sans-serif"],
+                        "prompt": ["Prompt", "sans-serif"] // เพิ่มฟอนต์สำหรับ Navbar
                     },
                     borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
                     animation: {
@@ -180,7 +265,133 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-[#1b0d14] dark:text-[#f3e7ed] antialiased min-h-screen flex flex-col">
-<div class="flex min-h-screen w-full flex-row overflow-hidden">
+
+<nav class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-pink-100 dark:border-gray-800 font-prompt">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center h-20 w-full">
+        <a href="../home.php" class="flex-shrink-0 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+            <span class="material-icons-round text-primary text-4xl">spa</span>
+            <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
+        </a>
+
+        <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-20">
+            <a class="group flex flex-col items-center justify-center transition" href="../shop/products.php">
+                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">สินค้า</span>
+                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Shop)</span>
+            </a>
+            
+            <div class="relative group">
+                <button class="flex flex-col items-center justify-center transition pb-2 pt-2">
+                    <div class="flex items-center gap-1">
+                        <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">หมวดหมู่</span>
+                        <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
+                    </div>
+                    <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Categories)</span>
+                </button>
+                <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">TONERPADS (โทนเนอร์แพด)</a>
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">BLUSH (บลัชออน)</a>
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">LIPS (ริมฝีปาก)</a>
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">SKIN (ผิว)</a>
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">EYES (ตา)</a>
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">ACCESSORIES (อุปกรณ์เสริม)</a>
+                    </div>
+                </div>
+            </div>
+
+            <a class="group flex flex-col items-center justify-center transition" href="../shop/promotions.php">
+                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">โปรโมชั่น</span>
+                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Sale)</span>
+            </a>
+            <a class="group flex flex-col items-center justify-center transition" href="contact.php">
+                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">ติดต่อเรา</span>
+                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Contact)</span>
+            </a>
+        </div>
+
+        <div class="flex items-center space-x-3 sm:space-x-5 text-gray-600 dark:text-gray-300">
+            <a href="../shop/favorites.php" class="hover:text-primary transition relative flex items-center">
+                <span class="material-icons-round text-2xl">favorite_border</span>
+            </a>
+            <a href="../shop/cart.php" class="hover:text-primary transition relative flex items-center">
+                <span class="material-icons-round text-2xl">shopping_bag</span>
+                <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800">
+                    <?= $totalCartItems ?>
+                </span>
+            </a>
+            
+            <button class="hover:text-primary transition flex items-center justify-center" onclick="toggleTheme()">
+                <span class="material-icons-round dark:hidden text-2xl text-gray-500">dark_mode</span>
+                <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
+            </button>
+
+            <div class="relative group flex items-center">
+                <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                    <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
+                        <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
+                    </div>
+                </a>
+                
+                <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
+                    <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
+                        
+                        <div class="text-center mb-4">
+                            <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
+                                <?= $isLoggedIn ? htmlspecialchars($userData['u_email']) : 'กรุณาเข้าสู่ระบบเพื่อใช้งาน' ?>
+                            </span>
+                        </div>
+
+                        <div class="flex justify-center relative mb-4">
+                            <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
+                                <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
+                                    <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-2 mb-6">
+                            <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username']) ?></h3>
+                        </div>
+
+                        <div class="flex flex-col gap-3 mt-2">
+                            <?php if($isAdmin): ?>
+                                <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                    <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+                                </a>
+                                <a href="logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                                </a>
+                            <?php elseif($isLoggedIn): ?>
+                                <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    จัดการบัญชี
+                                </a>
+                                <a href="logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                                </a>
+                            <?php else: ?>
+                                <a href="login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
+                                </a>
+                                <a href="register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
+                                </a>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="flex justify-center items-center gap-2 mt-5 text-[11px] text-gray-400">
+                            <a href="#" class="hover:text-primary">นโยบายความเป็นส่วนตัว</a>
+                            <span>•</span>
+                            <a href="#" class="hover:text-primary">ข้อกำหนดบริการ</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+    </div>
+</div>
+</nav>
+<div class="flex flex-1 w-full flex-row overflow-hidden">
     
 <div id="visual-container" class="hidden lg:flex w-1/2 relative bg-gradient-to-br from-[#ffecd2] via-[#fcb69f] to-[#e0c3fc] items-center justify-center overflow-hidden">
     
