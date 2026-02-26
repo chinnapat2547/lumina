@@ -315,7 +315,7 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                         </li>
                         <li class="flex items-start gap-3">
                             <span class="material-icons-round text-green-500 bg-white dark:bg-gray-800 rounded-full text-[18px] p-0.5 shadow-sm mt-0.5">check</span>
-                            <span class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">จัดส่งฟรี เมื่อสั่งซื้อครบ 500 บาทขึ้นไป</span>
+                            <span class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">จัดส่งฟรี เมื่อสั่งซื้อครบ 1,000 บาทขึ้นไป</span>
                         </li>
                         <li class="flex items-start gap-3">
                             <span class="material-icons-round text-green-500 bg-white dark:bg-gray-800 rounded-full text-[18px] p-0.5 shadow-sm mt-0.5">check</span>
