@@ -52,7 +52,8 @@ $cartItems = [];
 $subtotal = 0;
 $totalCartItems = 0;
 
-$sqlCart = "SELECT c.cart_id, c.quantity, c.selected_color, p.p_id, p.p_name, p.p_price, p.p_image 
+// 🟢 แก้ไขตรงนี้: เอา c.selected_color ออกจากคำสั่ง SQL เพื่อป้องกัน Error ฐานข้อมูล
+$sqlCart = "SELECT c.cart_id, c.quantity, p.p_id, p.p_name, p.p_price, p.p_image 
             FROM `cart` c 
             JOIN `product` p ON c.p_id = p.p_id 
             WHERE c.u_id = ?";
