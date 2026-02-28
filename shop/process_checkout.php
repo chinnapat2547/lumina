@@ -271,16 +271,15 @@ if ($payment_status === 'success' && !isset($_SESSION['order_saved'])) {
             <h2 class="text-2xl font-bold text-primary mb-6">ยอดชำระ: ฿<?= number_format($netTotal, 2) ?></h2>
             
             <div class="w-48 h-48 bg-white mx-auto rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center mb-6 p-2">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
+                <img src="../profile/qr.JPEG" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
             </div>
 
             <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-left max-w-sm mx-auto">
                 <div class="flex items-center gap-3 mb-2">
-                    <img src="https://upload.wikimedia.org/wikipedia/th/thumb/0/00/KBank_Logo.svg/200px-KBank_Logo.svg.png" alt="KBank" class="h-6 object-contain">
-                    <span class="font-bold text-gray-800 dark:text-white">ธนาคารกสิกรไทย</span>
+                    <span class="font-bold text-gray-800 dark:text-white">ธนาคารกรุงเทพ</span>
                 </div>
                 <div class="flex justify-between items-center">
-                    <span class="text-lg font-mono text-gray-600 dark:text-gray-300 font-medium tracking-wider">123-4-56789-0</span>
+                    <span class="text-lg font-mono text-gray-600 dark:text-gray-300 font-medium tracking-wider">414-425-3830</span>
                     <button class="text-primary text-sm font-bold hover:underline" onclick="navigator.clipboard.writeText('1234567890'); Swal.fire({toast:true, position:'top-end', icon:'success', title:'คัดลอกเลขบัญชีแล้ว', showConfirmButton:false, timer:1500});">คัดลอก</button>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">ชื่อบัญชี: บจก. ลูมิน่า บิวตี้</p>

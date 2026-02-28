@@ -294,12 +294,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
                 </h2>
                 
                 <div class="space-y-3" id="paymentContainer">
-                    <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-primary bg-pink-50/30 dark:bg-gray-700 cursor-pointer transition-all duration-300">
-                        <input checked class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="promptpay" onchange="updatePaymentUI()"/>
-                        <span class="material-icons-round text-primary text-2xl transition-colors">qr_code_2</span>
-                        <span class="flex-1 font-bold text-gray-900 dark:text-white transition-colors">พร้อมเพย์ QR Code (PromptPay)</span>
-                        <span class="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-bold shadow-sm border border-primary/20">ยอดนิยม</span>
-                    </label>
+                    
                     
                     <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all duration-300">
                         <input class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="credit_card" onchange="updatePaymentUI()"/>
@@ -310,6 +305,14 @@ $netTotal = $subtotal + $shippingCost - $discount;
                             <div class="h-6 w-10 bg-gray-100 dark:bg-gray-600 rounded flex items-center justify-center text-[8px] font-bold text-red-500">MASTER</div>
                         </div>
                     </label>
+
+                    <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-primary bg-pink-50/30 dark:bg-gray-700 cursor-pointer transition-all duration-300">
+                        <input checked class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="promptpay" onchange="updatePaymentUI()"/>
+                        <span class="material-icons-round text-primary text-2xl transition-colors">qr_code_2</span>
+                        <span class="flex-1 font-bold text-gray-900 dark:text-white transition-colors">พร้อมเพย์ QR Code หรือโอนผ่านบัญชีธนาคาร</span>
+                        <span class="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-bold shadow-sm border border-primary/20">ยอดนิยม</span>
+                    </label>
+
                     
                     <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all duration-300">
                         <input class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="cod" onchange="updatePaymentUI()"/>
