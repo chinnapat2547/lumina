@@ -263,7 +263,7 @@ $totalCartItems = 0;
                         <span>ข้อมูลส่วนตัว</span>
                     </a>
                     <a class="flex items-center space-x-3 px-4 py-3 bg-pink-50 dark:bg-pink-900/20 text-primary font-medium rounded-2xl transition-all shadow-sm" href="manageaccount.php">
-                        <span class="material-icons-round">account_balance_wallet</span>
+                        <span class="material-icons-round text-4xl">manage_accounts</span>
                         <span>รายละเอียดบัญชี</span>
                     </a>
                     <a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="payment.php">
