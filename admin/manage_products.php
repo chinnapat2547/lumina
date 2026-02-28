@@ -503,7 +503,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         <img id="mainImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="mainImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
                             <div class="w-16 h-16 bg-pink-50 text-primary rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm"><span class="material-icons-round text-3xl">add_photo_alternate</span></div>
-                            <span class="text-sm font-bold text-primary">คลิกอัปโหลดรูปปก(ขนาดไม่เกิน 2 MB)</span>
+                            <span class="text-sm font-bold text-primary">คลิกอัปโหลดรูปปก<br>(ขนาดไม่เกิน 2 MB)</span>
                         </div>
                         <button type="button" id="removeMainImageBtn" onclick="removeMainImage(event)" class="hidden absolute top-3 right-3 z-20 w-9 h-9 bg-white/90 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
                             <span class="material-icons-round text-[18px]">close</span>
