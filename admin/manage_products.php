@@ -11,63 +11,77 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories[] = $c; }
 // 1. จัดการเพิ่มสินค้า (POST)
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'add_product') {
-    $name = $_POST['p_name'];
-    $sku = $_POST['p_sku'];
-    $cat_id = (int)$_POST['c_id'];
-    $price = (float)$_POST['p_price'];
-    $stock = (int)$_POST['p_stock'];
-    $detail = $_POST['p_detail'];
+    $name = trim($_POST['p_name'] ?? '');
+    $sku = trim($_POST['p_sku'] ?? '');
+    $cat_id = (int)($_POST['c_id'] ?? 0);
+    $price = (float)($_POST['p_price'] ?? 0);
+    $stock = (int)($_POST['p_stock'] ?? 0);
+    $detail = trim($_POST['p_detail'] ?? '');
 
     $sql = "INSERT INTO product (p_name, p_sku, c_id, p_price, p_stock, p_detail) VALUES (?, ?, ?, ?, ?, ?)";
     $stmt = mysqli_prepare($conn, $sql);
-    mysqli_stmt_bind_param($stmt, "ssidis", $name, $sku, $cat_id, $price, $stock, $detail);
     
-    if (mysqli_stmt_execute($stmt)) {
-        $product_id = mysqli_insert_id($conn);
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, "ssidis", $name, $sku, $cat_id, $price, $stock, $detail);
         
-        // เช็คและสร้างโฟลเดอร์ถ้ายังไม่มี
-        $upload_dir = "../uploads/products/";
-        if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
+        if (mysqli_stmt_execute($stmt)) {
+            $product_id = mysqli_insert_id($conn);
+            
+            // เช็คและสร้างโฟลเดอร์ถ้ายังไม่มี
+            $upload_dir = "../uploads/products/";
+            if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
 
-        // อัปโหลดรูปหน้าปก
-        if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
-            $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
-            $main_img_name = "prod_" . $product_id . "_main." . $ext;
-            if(move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)){
-                mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $product_id");
+            // อัปโหลดรูปหน้าปก
+            if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
+                $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
+                if (empty($ext)) $ext = 'jpg'; // กันเหนียวถ้านามสกุลหาย
+                $main_img_name = "prod_" . $product_id . "_main_" . time() . "." . $ext;
+                
+                if(move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)){
+                    mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $product_id");
+                } else {
+                    $_SESSION['error_msg'] = "เพิ่มสินค้าสำเร็จ แต่ไม่สามารถบันทึกรูปภาพได้ (กรุณาเช็ค Permission โฟลเดอร์)";
+                }
             }
-        }
 
-        // อัปโหลดรูป Gallery
-        if (isset($_FILES['gallery_images'])) {
-            foreach ($_FILES['gallery_images']['tmp_name'] as $key => $tmp_name) {
-                if ($_FILES['gallery_images']['error'][$key] == 0) {
-                    $ext = pathinfo($_FILES['gallery_images']['name'][$key], PATHINFO_EXTENSION);
-                    $gall_img_name = "prod_" . $product_id . "_gall_" . time() . "_" . $key . "." . $ext;
-                    if (move_uploaded_file($tmp_name, $upload_dir . $gall_img_name)) {
-                        mysqli_query($conn, "INSERT INTO product_images (p_id, image_url) VALUES ($product_id, '$gall_img_name')");
+            // อัปโหลดรูป Gallery
+            if (isset($_FILES['gallery_images'])) {
+                foreach ($_FILES['gallery_images']['tmp_name'] as $key => $tmp_name) {
+                    if ($_FILES['gallery_images']['error'][$key] == 0) {
+                        $ext = pathinfo($_FILES['gallery_images']['name'][$key], PATHINFO_EXTENSION);
+                        if (empty($ext)) $ext = 'jpg';
+                        $gall_img_name = "prod_" . $product_id . "_gall_" . time() . "_" . $key . "." . $ext;
+                        if (move_uploaded_file($tmp_name, $upload_dir . $gall_img_name)) {
+                            mysqli_query($conn, "INSERT INTO product_images (p_id, image_url) VALUES ($product_id, '$gall_img_name')");
+                        }
                     }
                 }
             }
-        }
 
-        // เพิ่มสี
-        if (isset($_POST['color_names']) && isset($_POST['color_hexes'])) {
-            $c_names = $_POST['color_names'];
-            $c_hexes = $_POST['color_hexes'];
-            for ($i = 0; $i < count($c_names); $i++) {
-                if (!empty($c_names[$i])) {
-                    $c_name = mysqli_real_escape_string($conn, $c_names[$i]);
-                    $c_hex = mysqli_real_escape_string($conn, $c_hexes[$i]);
-                    mysqli_query($conn, "INSERT INTO product_colors (p_id, color_name, color_hex) VALUES ($product_id, '$c_name', '$c_hex')");
+            // เพิ่มตัวเลือกสี
+            if (isset($_POST['color_names']) && isset($_POST['color_hexes'])) {
+                $c_names = $_POST['color_names'];
+                $c_hexes = $_POST['color_hexes'];
+                for ($i = 0; $i < count($c_names); $i++) {
+                    if (!empty(trim($c_names[$i]))) {
+                        $c_name = mysqli_real_escape_string($conn, trim($c_names[$i]));
+                        $c_hex = mysqli_real_escape_string($conn, trim($c_hexes[$i]));
+                        mysqli_query($conn, "INSERT INTO product_colors (p_id, color_name, color_hex) VALUES ($product_id, '$c_name', '$c_hex')");
+                    }
                 }
             }
+            
+            if(!isset($_SESSION['error_msg'])) {
+                $_SESSION['success_msg'] = "เพิ่มสินค้าใหม่สำเร็จ!";
+            }
+        } else {
+            $_SESSION['error_msg'] = "SQL Error (Execute): " . mysqli_stmt_error($stmt);
         }
-        
-        $_SESSION['success_msg'] = "เพิ่มสินค้าสำเร็จ!";
+        mysqli_stmt_close($stmt);
     } else {
-        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึก: " . mysqli_error($conn);
+        $_SESSION['error_msg'] = "SQL Error (Prepare): " . mysqli_error($conn);
     }
+    
     header("Location: manage_products.php");
     exit();
 }
@@ -77,36 +91,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'edit_product') {
     $p_id = (int)$_POST['edit_p_id'];
-    $name = $_POST['p_name'];
-    $sku = $_POST['p_sku'];
-    $cat_id = (int)$_POST['c_id'];
-    $price = (float)$_POST['p_price'];
-    $stock = (int)$_POST['p_stock'];
-    $detail = $_POST['p_detail'];
+    $name = trim($_POST['p_name'] ?? '');
+    $sku = trim($_POST['p_sku'] ?? '');
+    $cat_id = (int)($_POST['c_id'] ?? 0);
+    $price = (float)($_POST['p_price'] ?? 0);
+    $stock = (int)($_POST['p_stock'] ?? 0);
+    $detail = trim($_POST['p_detail'] ?? '');
 
     $sql = "UPDATE product SET p_name=?, p_sku=?, c_id=?, p_price=?, p_stock=?, p_detail=? WHERE p_id=?";
     $stmt = mysqli_prepare($conn, $sql);
     
-    // 🟢 แก้ไขตรงนี้: เพิ่ม 'i' ต่อท้ายสุด (เป็น 7 ตัว) ให้ครบจำนวนตัวแปรที่ส่งไป 🟢
-    mysqli_stmt_bind_param($stmt, "ssidisi", $name, $sku, $cat_id, $price, $stock, $detail, $p_id);
-    
-    if (mysqli_stmt_execute($stmt)) {
-        $upload_dir = "../uploads/products/";
-        if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
+    if ($stmt) {
+        // แก้ไข binding ให้ตรงกับตัวแปร 7 ตัว (เพิ่ม i ตัวสุดท้าย)
+        mysqli_stmt_bind_param($stmt, "ssidisi", $name, $sku, $cat_id, $price, $stock, $detail, $p_id);
+        
+        if (mysqli_stmt_execute($stmt)) {
+            $upload_dir = "../uploads/products/";
+            if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
 
-        // ถ้ามีการอัปโหลดรูปปกใหม่ ให้เปลี่ยนรูป
-        if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
-            $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
-            $main_img_name = "prod_" . $p_id . "_main_" . time() . "." . $ext;
-            if (move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)) {
-                mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $p_id");
+            // ถ้ามีการอัปโหลดรูปปกใหม่ ให้เปลี่ยนรูป
+            if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
+                $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
+                if (empty($ext)) $ext = 'jpg';
+                $main_img_name = "prod_" . $p_id . "_main_" . time() . "." . $ext;
+                
+                if (move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)) {
+                    mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $p_id");
+                } else {
+                    $_SESSION['error_msg'] = "อัปเดตข้อมูลสำเร็จ แต่ไม่สามารถบันทึกรูปใหม่ได้";
+                }
             }
-        }
 
-        $_SESSION['success_msg'] = "แก้ไขข้อมูลสินค้าสำเร็จ!";
+            if(!isset($_SESSION['error_msg'])) {
+                $_SESSION['success_msg'] = "แก้ไขข้อมูลสินค้าสำเร็จ!";
+            }
+        } else {
+            $_SESSION['error_msg'] = "SQL Error (Execute): " . mysqli_stmt_error($stmt);
+        }
+        mysqli_stmt_close($stmt);
     } else {
-        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการแก้ไข: " . mysqli_error($conn);
+        $_SESSION['error_msg'] = "SQL Error (Prepare): " . mysqli_error($conn);
     }
+    
     header("Location: manage_products.php");
     exit();
 }
@@ -144,8 +170,7 @@ $stat_out = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM pr
 $stat_low = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock > 0 AND p_stock <= 10"))['c'];
 
 // โชว์แจ้งเตือนออเดอร์ (Sidebar)
-$today = date('Y-m-d');
-$newOrders = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(order_id) as c FROM orders WHERE DATE(created_at) = '$today'"))['c'] ?? 0;
+$countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
 
 // ดึงสินค้า
 $products = [];
@@ -230,8 +255,8 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_orders.php">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
                     <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
-                    <?php if($newOrders > 0): ?>
-                        <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newOrders ?></span>
+                    <?php if($countPending > 0): ?>
+                        <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $countPending ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_customers.php">
@@ -275,7 +300,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
             <div class="flex items-center gap-4 lg:gap-6 ml-auto">
                 <button class="relative p-2.5 rounded-full bg-white text-gray-500 hover:text-primary hover:bg-pink-50 transition-colors shadow-sm border border-pink-50">
                     <span class="material-icons-round text-[22px]">notifications</span>
-                    <span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                    <?= $countPending > 0 ? '<span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>' : '' ?>
                 </button>
                 
                 <div class="relative group flex items-center">
@@ -312,7 +337,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                             </div>
 
                             <div class="flex flex-col gap-3">
-                                <a href="#" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-purple-500">
+                                <a href="settings.php" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-purple-500">
                                     <span class="material-icons-round text-[18px]">manage_accounts</span> จัดการบัญชี
                                 </a>
                                 <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-red-500">
@@ -346,7 +371,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         </div>
                         <div>
                             <p class="text-gray-500 text-sm font-semibold">สินค้าทั้งหมด</p>
-                            <h3 class="text-3xl font-extrabold text-gray-800"><?= $stat_total ?></h3>
+                            <h3 class="text-3xl font-extrabold text-gray-800"><?= number_format($stat_total) ?></h3>
                         </div>
                     </div>
                 </div>
@@ -358,7 +383,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         </div>
                         <div>
                             <p class="text-gray-500 text-sm font-semibold">สินค้าที่หมด</p>
-                            <h3 class="text-3xl font-extrabold text-gray-800"><?= $stat_out ?></h3>
+                            <h3 class="text-3xl font-extrabold text-gray-800"><?= number_format($stat_out) ?></h3>
                         </div>
                     </div>
                 </div>
@@ -370,7 +395,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         </div>
                         <div>
                             <p class="text-gray-500 text-sm font-semibold">สินค้าใกล้หมด</p>
-                            <h3 class="text-3xl font-extrabold text-gray-800"><?= $stat_low ?></h3>
+                            <h3 class="text-3xl font-extrabold text-gray-800"><?= number_format($stat_low) ?></h3>
                         </div>
                     </div>
                 </div>
@@ -392,7 +417,9 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         </thead>
                         <tbody class="text-sm divide-y divide-gray-50">
                             <?php foreach($products as $p): 
-                                $img = (!empty($p['p_image']) && file_exists("../uploads/products/".$p['p_image'])) ? "../uploads/products/".$p['p_image'] : "https://via.placeholder.com/150";
+                                $img = (!empty($p['p_image']) && file_exists("../uploads/products/".$p['p_image'])) 
+                                    ? "../uploads/products/".$p['p_image'] 
+                                    : "https://placehold.co/150x150/fce7f3/ec2d88?text=No+Image"; // เปลี่ยน Fallback เผื่อ placeholder เดิมเสีย
                             ?>
                             <tr class="hover:bg-pink-50/30 transition-colors group">
                                 <td class="px-6 py-4 pl-8">
@@ -402,8 +429,8 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex flex-col">
-                                        <span class="font-bold text-gray-800 text-base mb-0.5 group-hover:text-primary transition-colors"><?= htmlspecialchars($p['p_name']) ?></span>
-                                        <span class="text-[12px] text-gray-400 font-mono bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">SKU: <?= htmlspecialchars($p['p_sku']) ?></span>
+                                        <span class="font-bold text-gray-800 text-base mb-0.5 group-hover:text-primary transition-colors line-clamp-2"><?= htmlspecialchars($p['p_name']) ?></span>
+                                        <span class="text-[12px] text-gray-400 font-mono bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">SKU: <?= htmlspecialchars($p['p_sku'] ?: '-') ?></span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
@@ -411,7 +438,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                         <?= htmlspecialchars($p['c_name'] ?? 'ไม่มีหมวดหมู่') ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 font-bold text-gray-800 text-base">฿<?= number_format($p['p_price']) ?></td>
+                                <td class="px-6 py-4 font-bold text-gray-800 text-base">฿<?= number_format($p['p_price'], 2) ?></td>
                                 <td class="px-6 py-4 text-center">
                                     <?php if($p['p_stock'] == 0): ?>
                                         <span class="font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg text-xs shadow-sm">สินค้าหมด</span>
@@ -430,8 +457,16 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                 </td>
                                 
                                 <td class="px-6 py-4 text-right pr-8">
-                                    <button onclick="openEditModal(<?= $p['p_id'] ?>, '<?= htmlspecialchars($p['p_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($p['p_sku'], ENT_QUOTES) ?>', <?= $p['c_id'] ?>, <?= $p['p_price'] ?>, <?= $p['p_stock'] ?>, '<?= htmlspecialchars(str_replace(array("\r", "\n"), array('\r', '\n'), $p['p_detail'] ?? ''), ENT_QUOTES) ?>', '<?= $img ?>')" class="w-9 h-9 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors inline-flex items-center justify-center mr-1"><span class="material-icons-round text-[20px]">edit</span></button>
-                                    <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="w-9 h-9 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex items-center justify-center"><span class="material-icons-round text-[20px]">delete</span></button>
+                                    <button 
+                                        data-product="<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-img="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8') ?>"
+                                        onclick="openEditModal(this)" 
+                                        class="w-9 h-9 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors inline-flex items-center justify-center mr-1 shadow-sm border border-gray-100">
+                                        <span class="material-icons-round text-[20px]">edit</span>
+                                    </button>
+                                    <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="w-9 h-9 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex items-center justify-center shadow-sm border border-gray-100">
+                                        <span class="material-icons-round text-[20px]">delete</span>
+                                    </button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -462,7 +497,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <h3 class="font-bold text-gray-800 mb-5 flex items-center gap-2 text-lg"><span class="material-icons-round text-primary bg-white p-1.5 rounded-xl shadow-sm">collections</span> รูปภาพสินค้า</h3>
                 
                 <div class="mb-6">
-                    <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพหลัก (ปก)</label>
+                    <label class="block text-xs font-bold text-gray-500 mb-2">รูปภาพหลัก (ปก) <span class="text-red-500">*</span></label>
                     <div class="w-full aspect-square border-2 border-dashed border-pink-300 rounded-3xl bg-white flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group shadow-sm">
                         <input type="file" name="main_image" id="mainImageInput" accept="image/*" required class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewMainImage(this)">
                         <img id="mainImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
@@ -641,15 +676,19 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    // โยนข้อมูลเก่าเข้าช่องกรอกสำหรับแก้ไข
-    function openEditModal(id, name, sku, cid, price, stock, detail, imgUrl) {
-        document.getElementById('edit_p_id').value = id;
-        document.getElementById('edit_p_name').value = name;
-        document.getElementById('edit_p_sku').value = sku;
-        document.getElementById('edit_c_id').value = cid;
-        document.getElementById('edit_p_price').value = price;
-        document.getElementById('edit_p_stock').value = stock;
-        document.getElementById('edit_p_detail').value = detail.replace(/\\n/g, "\n").replace(/\\r/g, "\r");
+    // 🟢 เปลี่ยนวิธีส่งข้อมูลให้ Modal Edit ผ่าน Dataset เพื่อป้องกัน JS Error จากเครื่องหมายคำพูด 🟢
+    function openEditModal(btnElement) {
+        // แปลงข้อมูล JSON ที่แนบมากับปุ่มกลับเป็น Object
+        const p = JSON.parse(btnElement.dataset.product);
+        const imgUrl = btnElement.dataset.img;
+
+        document.getElementById('edit_p_id').value = p.p_id;
+        document.getElementById('edit_p_name').value = p.p_name;
+        document.getElementById('edit_p_sku').value = p.p_sku || '';
+        document.getElementById('edit_c_id').value = p.c_id;
+        document.getElementById('edit_p_price').value = p.p_price;
+        document.getElementById('edit_p_stock').value = p.p_stock;
+        document.getElementById('edit_p_detail').value = p.p_detail || '';
         
         document.getElementById('editMainImageInput').value = ''; 
         if (imgUrl && !imgUrl.includes('placeholder')) {
@@ -699,13 +738,14 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         });
     }
 
+    // 🟢 ระบบแจ้งเตือน 🟢
     <?php if (isset($_SESSION['success_msg'])): ?>
         Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $_SESSION['success_msg'] ?>', confirmButtonColor: '#ec2d88', customClass: { popup: 'rounded-3xl' }});
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
 
     <?php if (isset($_SESSION['error_msg'])): ?>
-        Swal.fire({ icon: 'error', title: 'ข้อผิดพลาด!', text: '<?= $_SESSION['error_msg'] ?>', confirmButtonColor: '#ef4444', customClass: { popup: 'rounded-3xl' }});
+        Swal.fire({ icon: 'error', title: 'มีบางอย่างผิดพลาด', text: '<?= $_SESSION['error_msg'] ?>', confirmButtonColor: '#ef4444', customClass: { popup: 'rounded-3xl' }});
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
