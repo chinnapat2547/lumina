@@ -13,9 +13,9 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories[] = $c; }
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'add_product') {
     $name = $_POST['p_name'];
     $sku = $_POST['p_sku'];
-    $cat_id = $_POST['c_id'];
-    $price = $_POST['p_price'];
-    $stock = $_POST['p_stock'];
+    $cat_id = (int)$_POST['c_id'];
+    $price = (float)$_POST['p_price'];
+    $stock = (int)$_POST['p_stock'];
     $detail = $_POST['p_detail'];
 
     $sql = "INSERT INTO product (p_name, p_sku, c_id, p_price, p_stock, p_detail) VALUES (?, ?, ?, ?, ?, ?)";
@@ -24,13 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     
     if (mysqli_stmt_execute($stmt)) {
         $product_id = mysqli_insert_id($conn);
+        
+        // เช็คและสร้างโฟลเดอร์ถ้ายังไม่มี
+        $upload_dir = "../uploads/products/";
+        if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
 
         // อัปโหลดรูปหน้าปก
         if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
             $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
             $main_img_name = "prod_" . $product_id . "_main." . $ext;
-            move_uploaded_file($_FILES['main_image']['tmp_name'], "../uploads/products/" . $main_img_name);
-            mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $product_id");
+            if(move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)){
+                mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $product_id");
+            }
         }
 
         // อัปโหลดรูป Gallery
@@ -39,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 if ($_FILES['gallery_images']['error'][$key] == 0) {
                     $ext = pathinfo($_FILES['gallery_images']['name'][$key], PATHINFO_EXTENSION);
                     $gall_img_name = "prod_" . $product_id . "_gall_" . time() . "_" . $key . "." . $ext;
-                    if (move_uploaded_file($tmp_name, "../uploads/products/" . $gall_img_name)) {
+                    if (move_uploaded_file($tmp_name, $upload_dir . $gall_img_name)) {
                         mysqli_query($conn, "INSERT INTO product_images (p_id, image_url) VALUES ($product_id, '$gall_img_name')");
                     }
                 }
@@ -61,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         
         $_SESSION['success_msg'] = "เพิ่มสินค้าสำเร็จ!";
     } else {
-        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึก";
+        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึก: " . mysqli_error($conn);
     }
     header("Location: manage_products.php");
     exit();
@@ -74,25 +79,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     $p_id = (int)$_POST['edit_p_id'];
     $name = $_POST['p_name'];
     $sku = $_POST['p_sku'];
-    $cat_id = $_POST['c_id'];
-    $price = $_POST['p_price'];
-    $stock = $_POST['p_stock'];
+    $cat_id = (int)$_POST['c_id'];
+    $price = (float)$_POST['p_price'];
+    $stock = (int)$_POST['p_stock'];
     $detail = $_POST['p_detail'];
 
     $sql = "UPDATE product SET p_name=?, p_sku=?, c_id=?, p_price=?, p_stock=?, p_detail=? WHERE p_id=?";
     $stmt = mysqli_prepare($conn, $sql);
-    mysqli_stmt_bind_param($stmt, "ssidis", $name, $sku, $cat_id, $price, $stock, $detail, $p_id);
-    mysqli_stmt_execute($stmt);
+    
+    // 🟢 แก้ไขตรงนี้: เพิ่ม 'i' ต่อท้ายสุด (เป็น 7 ตัว) ให้ครบจำนวนตัวแปรที่ส่งไป 🟢
+    mysqli_stmt_bind_param($stmt, "ssidisi", $name, $sku, $cat_id, $price, $stock, $detail, $p_id);
+    
+    if (mysqli_stmt_execute($stmt)) {
+        $upload_dir = "../uploads/products/";
+        if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
 
-    // ถ้ามีการอัปโหลดรูปปกใหม่ ให้เปลี่ยนรูป
-    if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
-        $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
-        $main_img_name = "prod_" . $p_id . "_main_" . time() . "." . $ext;
-        move_uploaded_file($_FILES['main_image']['tmp_name'], "../uploads/products/" . $main_img_name);
-        mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $p_id");
+        // ถ้ามีการอัปโหลดรูปปกใหม่ ให้เปลี่ยนรูป
+        if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
+            $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
+            $main_img_name = "prod_" . $p_id . "_main_" . time() . "." . $ext;
+            if (move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)) {
+                mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $p_id");
+            }
+        }
+
+        $_SESSION['success_msg'] = "แก้ไขข้อมูลสินค้าสำเร็จ!";
+    } else {
+        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการแก้ไข: " . mysqli_error($conn);
     }
-
-    $_SESSION['success_msg'] = "แก้ไขข้อมูลสินค้าสำเร็จ!";
     header("Location: manage_products.php");
     exit();
 }
@@ -688,6 +702,11 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     <?php if (isset($_SESSION['success_msg'])): ?>
         Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $_SESSION['success_msg'] ?>', confirmButtonColor: '#ec2d88', customClass: { popup: 'rounded-3xl' }});
         <?php unset($_SESSION['success_msg']); ?>
+    <?php endif; ?>
+
+    <?php if (isset($_SESSION['error_msg'])): ?>
+        Swal.fire({ icon: 'error', title: 'ข้อผิดพลาด!', text: '<?= $_SESSION['error_msg'] ?>', confirmButtonColor: '#ef4444', customClass: { popup: 'rounded-3xl' }});
+        <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
     function previewMainImage(input) {
