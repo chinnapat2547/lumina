@@ -26,10 +26,11 @@ if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
             $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($rowUser['u_username']) . "&background=F43F85&color=fff";
         }
     }
+    mysqli_stmt_close($stmtUser);
 }
 
 // ==========================================
-// 2. ดึงข้อมูลตะกร้าสินค้า
+// 2. ดึงข้อมูลตะกร้าสินค้า & คำนวณราคาใหม่
 // ==========================================
 $cartItems = [];
 $subtotal = 0;
@@ -44,13 +45,17 @@ if ($stmtCart = mysqli_prepare($conn, $sqlCart)) {
         $subtotal += ($rowCart['p_price'] * $rowCart['quantity']);
         $totalCartItems += $rowCart['quantity'];
     }
+    mysqli_stmt_close($stmtCart);
 }
 
 // ==========================================
-// 3. จัดการ State และรับค่าจาก Checkout
+// 3. รับค่าจากหน้า checkout.php
 // ==========================================
-// รับค่าจากหน้า checkout.php ตอนกด "ยืนยันคำสั่งซื้อ" ครั้งแรก
+// ถ้ามีการส่งข้อมูลมาจากหน้า checkout สดๆ ร้อนๆ ให้รีเซ็ตสถานะเก่าทิ้ง เพื่อรับออเดอร์ใหม่
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['shipping_address'])) {
+    unset($_SESSION['order_saved']);
+    unset($_SESSION['last_order_no']);
+    
     $_SESSION['checkout_data'] = [
         'shipping_address' => $_POST['shipping_address'],
         'shipping_method' => $_POST['shipping_method'] ?? 'standard',
@@ -60,15 +65,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['shipping_address'])) 
 
 $checkoutData = $_SESSION['checkout_data'] ?? null;
 if (!$checkoutData || count($cartItems) == 0) {
-    // ถ้าไม่มีข้อมูล หรือไม่มีของในตะกร้า ให้กลับไปหน้าตะกร้า
     if (!isset($_SESSION['order_saved'])) {
         header("Location: cart.php");
         exit();
     }
 }
 
-// คำนวณราคาสุทธิ
-$shippingCost = ($checkoutData['shipping_method'] == 'express') ? 100 : (($subtotal >= 500) ? 0 : 50);
+// 🟢 คำนวณราคาสุทธิ (กฎครบ 1,000 ส่งฟรี/ด่วนลด 50)
+$isFreeShippingEligible = ($subtotal >= 1000);
+if ($checkoutData['shipping_method'] == 'express') {
+    $shippingCost = $isFreeShippingEligible ? 50 : 100;
+} else {
+    $shippingCost = $isFreeShippingEligible ? 0 : 50;
+}
 $netTotal = $subtotal + $shippingCost;
 
 $payment_status = 'pending'; 
@@ -77,41 +86,41 @@ $should_save_order = false;
 $slip_name = null;
 
 // ==========================================
-// 4. ลอจิกการตรวจสอบการชำระเงิน
+// 4. ลอจิกการตรวจสอบและบันทึกข้อมูล
 // ==========================================
-
-// เช็คว่าเคยเซฟออเดอร์นี้ไปแล้วหรือยัง (ป้องกันการรีเฟรชหน้าเว็บ)
+// เช็คว่าเคยเซฟออเดอร์นี้ไปแล้วหรือยังในการโหลดหน้านี้ครั้งก่อนหน้า
 if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
     $payment_status = 'success';
     $orderNo = $_SESSION['last_order_no'] ?? 'N/A';
     $totalCartItems = 0; // ตะกร้าว่างแล้ว
 } else {
-    // ก. ถ้าเป็นแบบ บัตรเครดิต หรือ เก็บเงินปลายทาง -> เซฟออเดอร์เลย ไม่ต้องรอสลิป
+    // ก. ถ้าเป็นแบบ บัตรเครดิต หรือ เก็บเงินปลายทาง -> เซฟออเดอร์ได้เลย
     if (in_array($checkoutData['payment_method'], ['credit_card', 'cod'])) {
         $should_save_order = true;
     } 
-    // ข. ถ้าเป็นแบบ โอนเงิน/PromptPay -> ต้องรอเช็ค Action การอัปโหลดสลิป
-    elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] == 'upload_slip') {
-        
-        // ตรวจสอบไฟล์สลิป
-        if (isset($_FILES['slip_image']) && $_FILES['slip_image']['error'] == 0) {
-            $uploadDir = '../uploads/slips/';
-            // สร้างโฟลเดอร์ถ้ายังไม่มี
-            if (!is_dir($uploadDir)) { mkdir($uploadDir, 0777, true); }
-            
-            $ext = pathinfo($_FILES['slip_image']['name'], PATHINFO_EXTENSION);
-            $slip_name = "slip_" . time() . "_" . $u_id . "." . $ext;
-            
-            if(move_uploaded_file($_FILES['slip_image']['tmp_name'], $uploadDir . $slip_name)){
-                $should_save_order = true; // อัปโหลดผ่าน พร้อมเซฟออเดอร์
+    // ข. ถ้าเป็นแบบ โอนเงิน/PromptPay -> ต้องรอรับสลิปโอนเงินก่อน
+    elseif ($checkoutData['payment_method'] === 'promptpay') {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] == 'upload_slip') {
+            if (isset($_FILES['slip_image']) && $_FILES['slip_image']['error'] == 0) {
+                $uploadDir = '../uploads/slips/';
+                if (!is_dir($uploadDir)) { mkdir($uploadDir, 0777, true); }
+                
+                $ext = pathinfo($_FILES['slip_image']['name'], PATHINFO_EXTENSION);
+                $slip_name = "slip_" . time() . "_" . $u_id . "." . $ext;
+                
+                if(move_uploaded_file($_FILES['slip_image']['tmp_name'], $uploadDir . $slip_name)){
+                    $should_save_order = true; // อัปโหลดผ่าน พร้อมเซฟออเดอร์
+                } else {
+                    $payment_status = 'failed';
+                    $error_msg = "ระบบขัดข้อง: ไม่สามารถบันทึกไฟล์รูปภาพสลิปได้";
+                }
             } else {
                 $payment_status = 'failed';
-                $error_msg = "ระบบขัดข้อง: ไม่สามารถบันทึกไฟล์รูปภาพได้ กรุณาลองใหม่";
+                $error_msg = "กรุณาแนบไฟล์สลิปหลักฐานการโอนเงิน เพื่อยืนยันการสั่งซื้อ";
             }
         } else {
-            // ไม่ได้แนบไฟล์มา
-            $payment_status = 'failed';
-            $error_msg = "กรุณาแนบไฟล์สลิปหลักฐานการโอนเงิน เพื่อยืนยันการสั่งซื้อ";
+            // ยังไม่ได้กดแนบสลิป ให้อยู่หน้า pending รอโอนเงิน
+            $payment_status = 'pending';
         }
     }
 
@@ -122,7 +131,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         $orderNo = "ORD" . date('Ymd') . rand(1000, 9999);
         $status = ($checkoutData['payment_method'] == 'cod') ? 'pending' : 'processing';
         
-        // 1. สร้างออเดอร์หลัก
+        // 1. บันทึกออเดอร์หลัก
         $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, total_amount, status) VALUES (?, ?, ?, ?)";
         if ($stmtOrder = mysqli_prepare($conn, $sqlInsertOrder)) {
             mysqli_stmt_bind_param($stmtOrder, "sids", $orderNo, $u_id, $netTotal, $status);
@@ -130,29 +139,20 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             if(mysqli_stmt_execute($stmtOrder)) {
                 $newOrderId = mysqli_insert_id($conn);
                 
-                // (Optional) 1.5 บันทึกข้อมูลการชำระเงินลงตาราง payment (ถ้ามี)
-                if ($slip_name != null) {
-                    $sqlPay = "INSERT INTO `payment` (order_id, payment_method, slip_image, amount) VALUES (?, ?, ?, ?)";
-                    if($stmtPay = mysqli_prepare($conn, $sqlPay)){
-                        $pm = $checkoutData['payment_method'];
-                        mysqli_stmt_bind_param($stmtPay, "issd", $newOrderId, $pm, $slip_name, $netTotal);
-                        mysqli_stmt_execute($stmtPay);
-                    }
-                }
-
-                // 2. บันทึกไอเทม และ ตัดสต๊อก
+                // 2. บันทึกสินค้าในตะกร้า และ ตัดสต๊อก
                 foreach ($cartItems as $item) {
                     $sqlInsertItem = "INSERT INTO `order_items` (order_id, p_id, p_name, p_price, quantity) VALUES (?, ?, ?, ?, ?)";
                     if ($stmtItem = mysqli_prepare($conn, $sqlInsertItem)) {
                         mysqli_stmt_bind_param($stmtItem, "iisdi", $newOrderId, $item['p_id'], $item['p_name'], $item['p_price'], $item['quantity']);
                         mysqli_stmt_execute($stmtItem);
+                        mysqli_stmt_close($stmtItem);
                     }
                     
-                    // ตัดสต๊อก
                     $sqlUpdateStock = "UPDATE `product` SET p_stock = p_stock - ? WHERE p_id = ?";
                     if ($stmtStock = mysqli_prepare($conn, $sqlUpdateStock)) {
                         mysqli_stmt_bind_param($stmtStock, "ii", $item['quantity'], $item['p_id']);
                         mysqli_stmt_execute($stmtStock);
+                        mysqli_stmt_close($stmtStock);
                     }
                 }
                 
@@ -161,22 +161,23 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                 if ($stmtClear = mysqli_prepare($conn, $sqlClearCart)) {
                     mysqli_stmt_bind_param($stmtClear, "i", $u_id);
                     mysqli_stmt_execute($stmtClear);
+                    mysqli_stmt_close($stmtClear);
                 }
                 
-                // บันทึกสถานะสำเร็จลง Session
+                // มาร์คสถานะว่าสำเร็จแล้ว
                 $_SESSION['order_saved'] = true;
                 $_SESSION['last_order_no'] = $orderNo;
                 $payment_status = 'success';
                 $totalCartItems = 0;
                 
             } else {
-                // ถ้า Insert ไม่เข้า (เช่น ฐานข้อมูลพัง หรือ ชื่อตาราง/คอลัมน์ไม่ตรง)
                 $payment_status = 'failed';
-                $error_msg = "เกิดข้อผิดพลาดในการบันทึกออเดอร์: " . mysqli_error($conn);
+                $error_msg = "Database Error: โครงสร้างตาราง orders ไม่ถูกต้อง -> " . mysqli_error($conn);
             }
+            mysqli_stmt_close($stmtOrder);
         } else {
             $payment_status = 'failed';
-            $error_msg = "เกิดข้อผิดพลาดในการเตรียมคำสั่ง SQL: " . mysqli_error($conn);
+            $error_msg = "Database Prepare Error -> " . mysqli_error($conn);
         }
     }
 }
@@ -185,7 +186,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
 <html lang="th"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>สถานะการสั่งซื้อ - Lumina Beauty</title>
+<title>สถานะการชำระเงิน - Lumina Beauty</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
@@ -310,7 +311,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                 <div class="w-40 h-40 bg-white mx-auto rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center p-2 relative">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
-                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1">
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-sm border border-gray-100">
                         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/PromptPay_logo.svg/1024px-PromptPay_logo.svg.png" class="h-4">
                     </div>
                 </div>
@@ -333,10 +334,10 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
 
         <form action="" method="POST" enctype="multipart/form-data" class="max-w-sm mx-auto">
             <input type="hidden" name="action" value="upload_slip">
-            <label class="upload-area block w-full rounded-2xl cursor-pointer p-6 mb-6 group bg-white dark:bg-gray-800 relative overflow-hidden">
+            <label class="upload-area block w-full rounded-2xl cursor-pointer p-6 mb-6 group bg-white dark:bg-gray-800 relative overflow-hidden shadow-sm">
                 <input type="file" name="slip_image" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" id="slipInput" onchange="previewFileName(this)">
                 <div class="flex flex-col items-center gap-3">
-                    <div class="w-14 h-14 bg-pink-50 dark:bg-gray-700 text-primary rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <div class="w-14 h-14 bg-pink-50 dark:bg-gray-700 text-primary rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
                         <span class="material-icons-round text-3xl">cloud_upload</span>
                     </div>
                     <span class="font-bold text-gray-700 dark:text-gray-200 text-sm" id="fileNameText">คลิกเพื่ออัปโหลดสลิปโอนเงิน</span>

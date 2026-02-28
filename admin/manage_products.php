@@ -209,7 +209,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     <span class="material-icons-round group-hover:scale-110 transition-transform">dashboard</span>
                     <span class="font-medium text-[15px]">ภาพรวมระบบ</span>
                 </a>
-                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="#">
+                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="manage_products.php">
                     <span class="material-icons-round">inventory_2</span>
                     <span class="font-bold text-[15px]">จัดการสินค้า</span>
                 </a>
@@ -220,11 +220,11 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newOrders ?></span>
                     <?php endif; ?>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="#">
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_customers.php">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">group</span>
                     <span class="font-medium text-[15px]">ข้อมูลลูกค้า</span>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="#">
+                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="settings.php">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">settings</span>
                     <span class="font-medium text-[15px]">ตั้งค่าระบบ</span>
                 </a>
