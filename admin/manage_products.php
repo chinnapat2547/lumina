@@ -503,7 +503,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                         <img id="mainImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="mainImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
                             <div class="w-16 h-16 bg-pink-50 text-primary rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm"><span class="material-icons-round text-3xl">add_photo_alternate</span></div>
-                            <span class="text-sm font-bold text-primary">คลิกอัปโหลดรูปปก</span>
+                            <span class="text-sm font-bold text-primary">คลิกอัปโหลดรูปปก(ขนาดไม่เกิน 2 MB)</span>
                         </div>
                         <button type="button" id="removeMainImageBtn" onclick="removeMainImage(event)" class="hidden absolute top-3 right-3 z-20 w-9 h-9 bg-white/90 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
                             <span class="material-icons-round text-[18px]">close</span>
@@ -514,7 +514,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <div class="mt-6">
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-xs font-bold text-gray-500">รูปภาพเพิ่มเติม (Gallery)</label>
-                        <span class="text-[10px] text-primary bg-white px-2 py-1 border border-pink-100 rounded-full font-bold shadow-sm">อัปโหลดได้ไม่จำกัด</span>
+                        <span class="text-[10px] text-primary bg-white px-2 py-1 border border-pink-100 rounded-full font-bold shadow-sm">อัปโหลดได้ไม่เกิน 8 MB</span>
                     </div>
                     
                     <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
