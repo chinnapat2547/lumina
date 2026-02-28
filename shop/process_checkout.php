@@ -130,24 +130,29 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
     if ($should_save_order) {
         $orderNo = "ORD" . date('Ymd') . rand(1000, 9999);
         $status = ($checkoutData['payment_method'] == 'cod') ? 'pending' : 'processing';
+        $pm = $checkoutData['payment_method'];
+        $sm = $checkoutData['shipping_method'];
         
-        // 1. บันทึกออเดอร์หลัก
-        $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, total_amount, status) VALUES (?, ?, ?, ?)";
+        // 1. บันทึกออเดอร์หลัก (เพิ่มคอลัมน์ช่องทางชำระเงิน, จัดส่ง, สลิป)
+        $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, total_amount, status, payment_method, shipping_method, slip_image) VALUES (?, ?, ?, ?, ?, ?, ?)";
         if ($stmtOrder = mysqli_prepare($conn, $sqlInsertOrder)) {
-            mysqli_stmt_bind_param($stmtOrder, "sids", $orderNo, $u_id, $netTotal, $status);
+            mysqli_stmt_bind_param($stmtOrder, "sidsiss", $orderNo, $u_id, $netTotal, $status, $pm, $sm, $slip_name);
             
             if(mysqli_stmt_execute($stmtOrder)) {
                 $newOrderId = mysqli_insert_id($conn);
                 
-                // 2. บันทึกสินค้าในตะกร้า และ ตัดสต๊อก
+                // 2. บันทึกสินค้าในตะกร้า และ ตัดสต๊อก (แก้ชื่อคอลัมน์เป็น price และ p_image ให้ตรงกับตาราง order_items)
                 foreach ($cartItems as $item) {
-                    $sqlInsertItem = "INSERT INTO `order_items` (order_id, p_id, p_name, p_price, quantity) VALUES (?, ?, ?, ?, ?)";
+                    $img = $item['p_image'] ?? '';
+                    $sqlInsertItem = "INSERT INTO `order_items` (order_id, p_id, p_name, p_image, price, quantity) VALUES (?, ?, ?, ?, ?, ?)";
                     if ($stmtItem = mysqli_prepare($conn, $sqlInsertItem)) {
-                        mysqli_stmt_bind_param($stmtItem, "iisdi", $newOrderId, $item['p_id'], $item['p_name'], $item['p_price'], $item['quantity']);
+                        // iisdsi = int, int, string, string, double, int
+                        mysqli_stmt_bind_param($stmtItem, "iisdsi", $newOrderId, $item['p_id'], $item['p_name'], $img, $item['p_price'], $item['quantity']);
                         mysqli_stmt_execute($stmtItem);
                         mysqli_stmt_close($stmtItem);
                     }
                     
+                    // อัปเดตตัดสต๊อก
                     $sqlUpdateStock = "UPDATE `product` SET p_stock = p_stock - ? WHERE p_id = ?";
                     if ($stmtStock = mysqli_prepare($conn, $sqlUpdateStock)) {
                         mysqli_stmt_bind_param($stmtStock, "ii", $item['quantity'], $item['p_id']);
@@ -172,12 +177,12 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                 
             } else {
                 $payment_status = 'failed';
-                $error_msg = "Database Error: โครงสร้างตาราง orders ไม่ถูกต้อง -> " . mysqli_error($conn);
+                $error_msg = "เกิดข้อผิดพลาดฐานข้อมูล (orders): " . mysqli_error($conn);
             }
             mysqli_stmt_close($stmtOrder);
         } else {
             $payment_status = 'failed';
-            $error_msg = "Database Prepare Error -> " . mysqli_error($conn);
+            $error_msg = "คำสั่ง SQL ผิดพลาด: " . mysqli_error($conn);
         }
     }
 }

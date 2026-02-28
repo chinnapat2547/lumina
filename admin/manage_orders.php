@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ==========================================
 if (isset($_GET['delete_id'])) {
     $del_id = (int)$_GET['delete_id'];
-    // ลบรายการย่อย และออเดอร์หลัก (เอา payment ออกเพราะใน DB ไม่มี order_id ในตาราง payment)
+    // ลบรายการย่อย และออเดอร์หลัก
     mysqli_query($conn, "DELETE FROM `order_items` WHERE order_id = $del_id");
     mysqli_query($conn, "DELETE FROM `orders` WHERE order_id = $del_id");
     
@@ -51,11 +51,12 @@ if ($current_filter !== 'all') {
 }
 
 // ==========================================
-// 5. ดึงข้อมูลออเดอร์ทั้งหมด (แก้ไข SQL ให้ตรงกับ DB)
+// 5. ดึงข้อมูลออเดอร์ทั้งหมด
 // ==========================================
 $orders = [];
+// 🟢 เพิ่มการดึง u.u_image เข้ามาใน SQL
 $sqlOrders = "
-    SELECT o.*, a.u_username, a.u_name, u.u_phone, 
+    SELECT o.*, a.u_username, a.u_name, u.u_phone, u.u_image,
            (SELECT CONCAT(address_line, ' ', district, ' ', province, ' ', zipcode) 
             FROM user_address WHERE u_id = o.u_id ORDER BY is_default DESC LIMIT 1) as u_address
     FROM `orders` o 
@@ -74,22 +75,11 @@ if ($resOrders = mysqli_query($conn, $sqlOrders)) {
         $sqlItems = "SELECT * FROM `order_items` WHERE order_id = $o_id";
         $resItems = mysqli_query($conn, $sqlItems);
         while ($item = mysqli_fetch_assoc($resItems)) {
-            // ดึงรูปสินค้าจากตาราง product มาด้วย
-            $p_id = $item['p_id'];
-            $imgRes = mysqli_query($conn, "SELECT p_image FROM `product` WHERE p_id = $p_id");
-            if ($imgRow = mysqli_fetch_assoc($imgRes)) {
-                $item['p_image'] = $imgRow['p_image'];
-            } else {
-                $item['p_image'] = '';
-            }
+            // ไม่ต้องไปดึงรูปซ้ำแล้ว เพราะมีเก็บ p_image ใน order_items แล้ว
             $items[] = $item;
         }
         
         $row['items'] = $items;
-        // Mock ข้อมูลที่ยังไม่มีในฐานข้อมูล
-        $row['payment_method'] = 'ไม่ระบุ'; 
-        $row['slip_image'] = null; 
-        
         $orders[] = $row;
     }
 }
@@ -254,14 +244,10 @@ function getPaymentMethodText($method) {
                             <div class="text-center mb-4"><span class="text-sm font-bold text-purple-500 bg-purple-50 px-3 py-1 rounded-full">Administrator Mode</span></div>
                             <div class="flex justify-center relative mb-3">
                                 <div class="rounded-full p-[3px] bg-purple-500 shadow-md">
-                                    <div class="bg-white rounded-full p-[2px] w-16 h-16">
-                                        <img src="<?= $adminAvatar ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
-                                    </div>
+                                    <div class="bg-white rounded-full p-[2px] w-16 h-16"><img src="<?= $adminAvatar ?>" alt="Profile" class="w-full h-full rounded-full object-cover"></div>
                                 </div>
                             </div>
-                            <div class="text-center mb-6">
-                                <h3 class="text-[20px] font-bold text-gray-800">สวัสดี, คุณ <?= htmlspecialchars($adminName) ?></h3>
-                            </div>
+                            <div class="text-center mb-6"><h3 class="text-[20px] font-bold text-gray-800">สวัสดี, คุณ <?= htmlspecialchars($adminName) ?></h3></div>
                             <div class="flex flex-col gap-3">
                                 <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-red-500">
                                     <span class="material-icons-round text-[18px]">logout</span> ออกจากระบบ
@@ -329,10 +315,14 @@ function getPaymentMethodText($method) {
                             <?php else: ?>
                                 <?php foreach($orders as $o): 
                                     $badge = getStatusBadge($o['status']);
-                                    $payInfo = getPaymentMethodText($o['payment_method']);
+                                    $payInfo = getPaymentMethodText($o['payment_method'] ?? 'ไม่ระบุ');
                                     $dateStr = date('d M Y, H:i', strtotime($o['created_at']));
                                     
-                                    // แปลงข้อมูลไอเทมและข้อมูลลูกค้าเป็น JSON เพื่อง่ายต่อการส่งเข้า Modal
+                                    // 🟢 สร้าง URL รูปภาพลูกค้า 🟢
+                                    $imgUrlTable = (!empty($o['u_image']) && file_exists("../uploads/" . $o['u_image'])) 
+                                        ? "../uploads/" . $o['u_image'] 
+                                        : "https://ui-avatars.com/api/?name=" . urlencode($o['u_name'] ?? $o['u_username'] ?? 'U') . "&background=fce7f3&color=ec2d88";
+                                    
                                     $o_json = htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8');
                                 ?>
                                 <tr class="hover:bg-pink-50/30 transition-colors group">
@@ -344,9 +334,7 @@ function getPaymentMethodText($method) {
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 rounded-full bg-pink-100 text-primary flex items-center justify-center font-bold text-sm">
-                                                <?= mb_substr($o['u_name'] ?? $o['u_username'] ?? 'U', 0, 1, 'UTF-8') ?>
-                                            </div>
+                                            <img src="<?= $imgUrlTable ?>" class="w-9 h-9 rounded-full object-cover shadow-sm border border-gray-100">
                                             <span class="font-bold text-gray-700"><?= htmlspecialchars($o['u_name'] ?? $o['u_username'] ?? 'ลูกค้าทั่วไป') ?></span>
                                         </div>
                                     </td>
@@ -432,24 +420,24 @@ function getPaymentMethodText($method) {
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><span class="material-icons-round text-primary">shopping_bag</span> รายการสินค้า</h3>
                         <div id="md_items_container" class="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
-                            </div>
+                        </div>
                     </div>
 
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><span class="material-icons-round text-primary">payments</span> หลักฐานการชำระเงิน</h3>
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><span class="material-icons-round text-primary">payments</span> การชำระเงิน & จัดส่ง</h3>
                         <div class="flex gap-6 items-start">
-                            <div class="w-32 h-40 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition" onclick="window.open(document.getElementById('md_slip_img').src, '_blank')">
+                            <div class="w-28 h-36 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition" onclick="window.open(document.getElementById('md_slip_img').src, '_blank')">
                                 <img id="md_slip_img" src="" alt="Slip" class="w-full h-full object-cover hidden">
-                                <span id="md_slip_none" class="text-xs text-gray-400 font-medium">ไม่มีรูปสลิป</span>
+                                <span id="md_slip_none" class="text-[10px] text-gray-400 font-medium text-center px-2">ไม่มีรูปสลิป / ไม่ได้โอน</span>
                             </div>
                             <div class="space-y-3 flex-1">
                                 <div>
                                     <p class="text-xs text-gray-500 mb-1">ช่องทางชำระเงิน:</p>
-                                    <div class="font-bold text-sm bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg inline-block border border-blue-100" id="md_pay_method">โอนผ่านธนาคาร</div>
+                                    <div class="font-bold text-sm bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg inline-block border border-blue-100" id="md_pay_method"></div>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500 mb-0.5">ยอดชำระ:</p>
-                                    <p class="font-bold text-primary text-lg" id="md_pay_amount">฿0.00</p>
+                                    <p class="text-xs text-gray-500 mb-1">รูปแบบจัดส่ง:</p>
+                                    <div class="font-bold text-sm px-3 py-1.5 rounded-lg inline-block border" id="md_shipping_method"></div>
                                 </div>
                             </div>
                         </div>
@@ -461,25 +449,29 @@ function getPaymentMethodText($method) {
                         <div class="absolute top-0 right-0 p-3 opacity-5"><span class="material-icons-round text-6xl text-primary">person</span></div>
                         <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2 relative z-10"><span class="material-icons-round text-primary">person</span> ข้อมูลลูกค้า</h3>
                         
-                        <div class="space-y-4 relative z-10">
+                        <div class="flex gap-4 items-center mb-4 relative z-10">
+                            <img id="md_cus_image" src="" class="w-14 h-14 rounded-full object-cover shadow-sm border border-gray-100">
                             <div>
-                                <p class="text-xs text-gray-500 mb-0.5">ชื่อลูกค้า</p>
-                                <p class="font-bold text-gray-800 text-sm" id="md_cus_name">คุณ มะลิ สวยใส</p>
+                                <p class="font-bold text-gray-800 text-lg" id="md_cus_name"></p>
+                                <p class="text-xs text-gray-500" id="md_cus_username"></p>
                             </div>
+                        </div>
+
+                        <div class="space-y-3 relative z-10 bg-gray-50 p-4 rounded-xl border border-gray-100">
                             <div>
                                 <p class="text-xs text-gray-500 mb-0.5">เบอร์โทรศัพท์</p>
-                                <p class="font-bold text-gray-800 text-sm flex items-center gap-1"><span class="material-icons-round text-[14px] text-gray-400">phone</span> <span id="md_cus_phone">081-234-5678</span></p>
+                                <p class="font-bold text-gray-800 text-sm flex items-center gap-1"><span class="material-icons-round text-[14px] text-gray-400">phone</span> <span id="md_cus_phone"></span></p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500 mb-0.5">ที่อยู่จัดส่ง</p>
-                                <p class="font-medium text-gray-600 text-sm leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100" id="md_cus_address">123/45 ซอย...</p>
+                                <p class="font-medium text-gray-600 text-sm leading-relaxed" id="md_cus_address"></p>
                             </div>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-2xl p-6 shadow-sm border border-pink-100 bg-gradient-to-b from-white to-pink-50/30">
                         <h3 class="font-bold text-gray-800 mb-4">สรุปยอดชำระ</h3>
-                        <div class="space-y-3 pb-4 border-b border-dashed border-gray-200">
+                        <div class="space-y-2 pb-4 border-b border-dashed border-gray-200">
                             <div class="flex justify-between text-sm">
                                 <span class="text-gray-500">ยอดรวมสินค้า</span>
                                 <span class="font-bold text-gray-700" id="md_sum_items">฿0.00</span>
@@ -491,14 +483,8 @@ function getPaymentMethodText($method) {
                         </div>
                         <div class="flex justify-between items-end pt-4">
                             <span class="font-bold text-gray-800">ยอดสุทธิ</span>
-                            <span class="font-extrabold text-2xl text-primary tracking-tight" id="md_sum_total">฿0.00</span>
+                            <span class="font-extrabold text-3xl text-primary tracking-tight" id="md_sum_total">฿0.00</span>
                         </div>
-                    </div>
-
-                    <div class="flex gap-3 pt-2">
-                        <button type="button" class="flex-1 bg-white border-2 border-gray-200 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-                            <span class="material-icons-round text-[18px]">print</span> พิมพ์ใบเสร็จ
-                        </button>
                     </div>
                 </div>
 
@@ -520,18 +506,33 @@ function getPaymentMethodText($method) {
         document.getElementById('md_form_order_id').value = order.order_id;
         document.getElementById('md_status_select').value = order.status;
 
-        document.getElementById('md_cus_name').innerText = order.u_name || order.u_username;
-        document.getElementById('md_cus_phone').innerText = order.u_phone || 'ไม่ระบุ';
-        document.getElementById('md_cus_address').innerText = order.u_address || 'ไม่ระบุ';
+        // 🟢 ข้อมูลลูกค้า & รูปโปรไฟล์ 🟢
+        document.getElementById('md_cus_name').innerText = order.u_name || order.u_username || 'ไม่ระบุ';
+        document.getElementById('md_cus_username').innerText = '@' + (order.u_username || '');
+        document.getElementById('md_cus_phone').innerText = order.u_phone || '-';
+        document.getElementById('md_cus_address').innerText = order.u_address || 'ไม่มีข้อมูลที่อยู่';
+        
+        let imgUrl = order.u_image ? '../uploads/' + order.u_image : "https://ui-avatars.com/api/?name=" + encodeURIComponent(order.u_name || order.u_username || 'U') + "&background=fce7f3&color=ec2d88";
+        document.getElementById('md_cus_image').src = imgUrl;
 
+        // ช่องทางชำระเงิน
         let payMethodText = 'ไม่ระบุ';
-        if(order.payment_method === 'promptpay') payMethodText = 'โอนเงินผ่านธนาคาร (QR)';
+        if(order.payment_method === 'promptpay') payMethodText = 'โอนเงิน (QR/บัญชี)';
         else if(order.payment_method === 'credit_card') payMethodText = 'บัตรเครดิต/เดบิต';
-        else if(order.payment_method === 'cod') payMethodText = 'ชำระเงินปลายทาง (COD)';
+        else if(order.payment_method === 'cod') payMethodText = 'เก็บเงินปลายทาง (COD)';
         document.getElementById('md_pay_method').innerText = payMethodText;
         
-        document.getElementById('md_pay_amount').innerText = '฿' + parseFloat(order.total_amount).toLocaleString('th-TH', {minimumFractionDigits: 2});
-        
+        // 🟢 รูปแบบการจัดส่ง 🟢
+        let shipEl = document.getElementById('md_shipping_method');
+        if(order.shipping_method === 'express') {
+            shipEl.innerText = 'ส่งด่วน (Express)';
+            shipEl.className = 'font-bold text-sm px-3 py-1.5 rounded-lg inline-block border text-purple-600 bg-purple-50 border-purple-100';
+        } else {
+            shipEl.innerText = 'ส่งธรรมดา (Standard)';
+            shipEl.className = 'font-bold text-sm px-3 py-1.5 rounded-lg inline-block border text-pink-600 bg-pink-50 border-pink-100';
+        }
+
+        // รูปสลิป
         const slipImg = document.getElementById('md_slip_img');
         const slipNone = document.getElementById('md_slip_none');
         if (order.slip_image) {
@@ -544,29 +545,36 @@ function getPaymentMethodText($method) {
             slipNone.classList.remove('hidden');
         }
 
+        // 🟢 รายการสินค้า (ใช้ item.price เพื่อให้ดึงราคาได้ถูกต้อง) 🟢
         const itemsContainer = document.getElementById('md_items_container');
         itemsContainer.innerHTML = '';
         let itemsTotal = 0;
         
-        order.items.forEach(item => {
-            itemsTotal += parseFloat(item.p_price) * parseInt(item.quantity);
-            const imgSrc = item.p_image ? '../uploads/products/' + item.p_image : 'https://via.placeholder.com/80';
-            
-            itemsContainer.innerHTML += `
-                <div class="flex gap-4 items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0">
-                    <img src="${imgSrc}" class="w-16 h-16 rounded-xl object-cover border border-gray-100 shadow-sm">
-                    <div class="flex-1">
-                        <p class="font-bold text-gray-800 text-sm line-clamp-1">${item.p_name}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">ราคาต่อชิ้น: ฿${parseFloat(item.p_price).toLocaleString('th-TH')}</p>
-                        <p class="text-xs text-primary font-bold mt-0.5">จำนวน: ${item.quantity}</p>
+        if(order.items && order.items.length > 0) {
+            order.items.forEach(item => {
+                const itemPrice = item.price ? item.price : item.p_price; // ป้องกันเผื่อกรณีค่าว่าง
+                itemsTotal += parseFloat(itemPrice) * parseInt(item.quantity);
+                const imgSrc = item.p_image ? '../uploads/products/' + item.p_image : 'https://via.placeholder.com/80';
+                
+                itemsContainer.innerHTML += `
+                    <div class="flex gap-4 items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                        <img src="${imgSrc}" class="w-16 h-16 rounded-xl object-cover border border-gray-100 shadow-sm">
+                        <div class="flex-1">
+                            <p class="font-bold text-gray-800 text-sm line-clamp-1">${item.p_name}</p>
+                            <p class="text-xs text-gray-400 mt-0.5">฿${parseFloat(itemPrice).toLocaleString('th-TH')} / ชิ้น</p>
+                            <p class="text-xs text-primary font-bold mt-0.5">จำนวน: ${item.quantity}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-gray-800 text-sm">฿${(itemPrice * item.quantity).toLocaleString('th-TH')}</p>
+                        </div>
                     </div>
-                    <div class="text-right">
-                        <p class="font-bold text-gray-800 text-sm">฿${(item.p_price * item.quantity).toLocaleString('th-TH')}</p>
-                    </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        } else {
+            itemsContainer.innerHTML = '<p class="text-center text-gray-400 text-sm py-4">ไม่พบข้อมูลสินค้า</p>';
+        }
 
+        // สรุปยอด
         const shippingCost = parseFloat(order.total_amount) - itemsTotal; 
         document.getElementById('md_sum_items').innerText = '฿' + itemsTotal.toLocaleString('th-TH', {minimumFractionDigits: 2});
         document.getElementById('md_sum_shipping').innerText = '฿' + (shippingCost > 0 ? shippingCost.toLocaleString('th-TH', {minimumFractionDigits: 2}) : '0.00');
@@ -594,7 +602,7 @@ function getPaymentMethodText($method) {
     function confirmDelete(id) {
         Swal.fire({
             title: 'ยืนยันการลบออเดอร์?',
-            text: "ข้อมูลรายการสั่งซื้อและการชำระเงินจะถูกลบถาวร!",
+            text: "ข้อมูลรายการสั่งซื้อจะถูกลบถาวร!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
