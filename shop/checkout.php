@@ -45,6 +45,27 @@ if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
 }
 
 // ==========================================
+// NEW: ตรวจสอบข้อมูลบัตรเครดิต
+// ==========================================
+$hasSavedCard = false;
+$savedCardLast4 = "";
+$savedCardType = "";
+
+// ตรวจสอบตาราง user_card (ถ้ามีในระบบ)
+$sqlCard = "SELECT card_last4, card_type FROM `user_card` WHERE u_id = ? AND is_default = 1 LIMIT 1";
+if ($stmtCard = mysqli_prepare($conn, $sqlCard)) {
+    mysqli_stmt_bind_param($stmtCard, "i", $u_id);
+    mysqli_stmt_execute($stmtCard);
+    $resultCard = mysqli_stmt_get_result($stmtCard);
+    if ($rowCard = mysqli_fetch_assoc($resultCard)) {
+        $hasSavedCard = true;
+        $savedCardLast4 = $rowCard['card_last4'];
+        $savedCardType = $rowCard['card_type'];
+    }
+    mysqli_stmt_close($stmtCard);
+}
+
+// ==========================================
 // 2. ดึงข้อมูลสินค้าในตะกร้า
 // ==========================================
 $cartItems = [];
@@ -126,7 +147,6 @@ $netTotal = $subtotal + $shippingCost - $discount;
                     radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.05) 0%, transparent 30%);
     }
     
-    /* สไตล์สำหรับ Scrollbar */
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #fce7f3; border-radius: 10px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -180,11 +200,45 @@ $netTotal = $subtotal + $shippingCost - $discount;
                 </button>
                 
                 <div class="relative group flex items-center">
-                    <a href="../profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=F43F85&color=fff'"/>
+                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=ec2d88&color=fff'"/>
                         </div>
                     </a>
+                    
+                    <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
+                        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
+                            <div class="text-center mb-4">
+                                <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
+                                    <?= $isAdmin ? 'Administrator Mode' : htmlspecialchars($userData['u_email'] ?? '') ?>
+                                </span>
+                            </div>
+                            <div class="flex justify-center relative mb-4">
+                                <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
+                                    <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
+                                        <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center mt-2 mb-6">
+                                <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username'] ?? 'User') ?></h3>
+                            </div>
+                            <div class="flex flex-col gap-3 mt-2">
+                                <?php if($isAdmin): ?>
+                                    <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                        <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+                                    </a>
+                                <?php else: ?>
+                                    <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                        จัดการบัญชี
+                                    </a>
+                                <?php endif; ?>
+                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -294,18 +348,6 @@ $netTotal = $subtotal + $shippingCost - $discount;
                 </h2>
                 
                 <div class="space-y-3" id="paymentContainer">
-                    
-                    
-                    <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all duration-300">
-                        <input class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="credit_card" onchange="updatePaymentUI()"/>
-                        <span class="material-icons-round text-gray-400 text-2xl transition-colors">credit_card</span>
-                        <span class="flex-1 font-medium text-gray-700 dark:text-gray-300 transition-colors">บัตรเครดิต / เดบิต</span>
-                        <div class="flex gap-1.5">
-                            <div class="h-6 w-10 bg-gray-100 dark:bg-gray-600 rounded flex items-center justify-center text-[8px] font-bold text-blue-800">VISA</div>
-                            <div class="h-6 w-10 bg-gray-100 dark:bg-gray-600 rounded flex items-center justify-center text-[8px] font-bold text-red-500">MASTER</div>
-                        </div>
-                    </label>
-
                     <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-primary bg-pink-50/30 dark:bg-gray-700 cursor-pointer transition-all duration-300">
                         <input checked class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="promptpay" onchange="updatePaymentUI()"/>
                         <span class="material-icons-round text-primary text-2xl transition-colors">qr_code_2</span>
@@ -313,7 +355,23 @@ $netTotal = $subtotal + $shippingCost - $discount;
                         <span class="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-bold shadow-sm border border-primary/20">ยอดนิยม</span>
                     </label>
 
-                    
+                    <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all duration-300">
+                        <input class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="credit_card" data-has-card="<?= $hasSavedCard ? 'true' : 'false' ?>" onchange="updatePaymentUI()"/>
+                        <span class="material-icons-round text-gray-400 text-2xl transition-colors">credit_card</span>
+                        
+                        <div class="flex-1 flex flex-col justify-center">
+                            <span class="font-medium text-gray-700 dark:text-gray-300 transition-colors">บัตรเครดิต / เดบิต</span>
+                            <?php if($hasSavedCard): ?>
+                                <span class="text-[11px] text-green-500 font-bold">ลงท้ายด้วย **** <?= htmlspecialchars($savedCardLast4) ?> (<?= htmlspecialchars($savedCardType) ?>)</span>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="flex gap-1.5">
+                            <div class="h-6 w-10 bg-gray-100 dark:bg-gray-600 rounded flex items-center justify-center text-[8px] font-bold text-blue-800">VISA</div>
+                            <div class="h-6 w-10 bg-gray-100 dark:bg-gray-600 rounded flex items-center justify-center text-[8px] font-bold text-red-500">MASTER</div>
+                        </div>
+                    </label>
+
                     <label class="payment-option flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all duration-300">
                         <input class="w-5 h-5 text-primary focus:ring-primary accent-primary" name="payment_method" type="radio" value="cod" onchange="updatePaymentUI()"/>
                         <span class="material-icons-round text-gray-400 text-2xl transition-colors">delivery_dining</span>
@@ -428,7 +486,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
                 </div>
             </label>
 
-            <a href="../profile/account.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-6 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group">
+            <a href="../profile/address.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-6 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group">
                 <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:text-primary group-hover:bg-white rounded-full flex items-center justify-center mx-auto mb-3 transition-colors shadow-sm">
                     <span class="material-icons-round text-2xl">add_location_alt</span>
                 </div>
@@ -444,24 +502,72 @@ $netTotal = $subtotal + $shippingCost - $discount;
     </div>
 </div>
 
+<div id="cardModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-300 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 modal-content border border-pink-50 dark:border-gray-700">
+        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <span class="material-icons-round text-primary">credit_card</span> เพิ่มบัตรเครดิต/เดบิต
+            </h2>
+            <button type="button" onclick="closeCardModal(false)" class="w-8 h-8 rounded-full bg-white dark:bg-gray-700 text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-600 flex items-center justify-center transition-colors shadow-sm">
+                <span class="material-icons-round text-[18px]">close</span>
+            </button>
+        </div>
+        
+        <div class="p-6 bg-white dark:bg-gray-800 space-y-5">
+            <div>
+                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">หมายเลขบัตร (Card Number)</label>
+                <div class="relative">
+                    <span class="absolute left-4 top-3 text-gray-400 material-icons-round text-xl">credit_card</span>
+                    <input type="text" placeholder="0000 0000 0000 0000" maxlength="19" class="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white font-mono">
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">ชื่อบนบัตร (Card Holder Name)</label>
+                <input type="text" placeholder="ชื่อ - นามสกุล" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">วันหมดอายุ (MM/YY)</label>
+                    <input type="text" placeholder="MM/YY" maxlength="5" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white text-center font-mono">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">รหัสความปลอดภัย (CVV)</label>
+                    <input type="password" placeholder="***" maxlength="3" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white text-center font-mono tracking-widest">
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 mt-2 ml-1">
+                <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
+                <span class="text-sm text-gray-600 dark:text-gray-400">บันทึกบัตรนี้ไว้ใช้ในครั้งถัดไป</span>
+            </div>
+        </div>
+        
+        <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
+            <button type="button" onclick="closeCardModal(false)" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 transition-colors">ยกเลิก</button>
+            <button type="button" onclick="closeCardModal(true)" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-lg shadow-primary/30 transition-transform transform hover:-translate-y-0.5">เพิ่มบัตร</button>
+        </div>
+    </div>
+</div>
+
+
 <script>
     // สลับ Dark Mode
-    if (localStorage.getItem('theme') === 'dark') {
-        document.documentElement.classList.add('dark');
-    }
+    if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
+    
     function toggleTheme() {
         const htmlEl = document.documentElement;
         htmlEl.classList.toggle('dark');
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
-    // ตัวแปรสำหรับคำนวณราคาแบบ Real-time ด้วย JS
+    // คำนวณราคา
     const subtotal = <?= $subtotal ?>;
     let shippingCost = <?= $shippingCost ?>; 
     const discount = <?= $discount ?>;
-    const isFreeShippingEligible = (subtotal >= 500); // เงื่อนไขส่งฟรี
+    const isFreeShippingEligible = (subtotal >= 500); 
 
-    // 🟢 อัปเดตสไตล์ของกรอบตัวเลือกการจัดส่ง 🟢
     function updateShipping(method) {
         if (isFreeShippingEligible) {
             shippingCost = 0; 
@@ -471,7 +577,6 @@ $netTotal = $subtotal + $shippingCost - $discount;
         
         let netTotal = subtotal + shippingCost - discount;
 
-        // อัปเดตตัวเลขใน UI
         const shipDisplay = document.getElementById('shippingDisplay');
         if (shippingCost === 0) {
             shipDisplay.innerHTML = '<span class="text-green-500">ฟรี</span>';
@@ -480,7 +585,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
         }
         document.getElementById('netTotalDisplay').innerText = netTotal.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
         
-        // สลับสีสไตล์กรอบ Radio จัดส่ง
+        // สลับสี Radio จัดส่ง
         const allLabels = document.querySelectorAll('input[name="shipping_method"]');
         allLabels.forEach(input => {
             const label = input.closest('label');
@@ -505,7 +610,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
         });
     }
 
-    // 🟢 อัปเดตสไตล์ของกรอบวิธีการชำระเงินให้ขยับตามการคลิก 🟢
+    // 🟢 อัปเดตสไตล์กรอบชำระเงิน + ตรวจสอบบัตรเครดิต 🟢
     function updatePaymentUI() {
         const paymentOptions = document.querySelectorAll('input[name="payment_method"]');
         
@@ -515,15 +620,24 @@ $netTotal = $subtotal + $shippingCost - $discount;
             const textSpan = label.querySelector('.font-medium, .font-bold');
 
             if (input.checked) {
-                // เปลี่ยนเป็นแบบ Active (มีกรอบสีชมพู)
+                // เปลี่ยนเป็น Active
                 label.classList.add('border-primary', 'bg-pink-50/30');
                 label.classList.remove('border-gray-100', 'dark:border-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-700');
                 icon.classList.add('text-primary');
                 icon.classList.remove('text-gray-400');
                 textSpan.classList.add('font-bold', 'text-gray-900', 'dark:text-white');
                 textSpan.classList.remove('font-medium', 'text-gray-700', 'dark:text-gray-300');
+
+                // ตรวจสอบถ้าเลือกบัตรเครดิตแล้วไม่มีข้อมูลบัตร ให้เปิด Modal
+                if (input.value === 'credit_card') {
+                    const hasCard = input.getAttribute('data-has-card') === 'true';
+                    if (!hasCard) {
+                        openCardModal();
+                    }
+                }
+
             } else {
-                // เปลี่ยนเป็นแบบ Inactive (กรอบเทา)
+                // เปลี่ยนเป็น Inactive
                 label.classList.remove('border-primary', 'bg-pink-50/30');
                 label.classList.add('border-gray-100', 'dark:border-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-700');
                 icon.classList.remove('text-primary');
@@ -534,33 +648,71 @@ $netTotal = $subtotal + $shippingCost - $discount;
         });
     }
 
-    // เรียกใช้งานตอนโหลดหน้าเว็บ เพื่อให้เซ็ตสีถูกต้องตั้งแต่เริ่ม
     document.addEventListener('DOMContentLoaded', () => {
         updatePaymentUI();
     });
 
-    // 🟢 สคริปต์สำหรับเปิด-ปิด Modal ที่อยู่ 🟢
+    // ----------------------------------------------------
+    // สคริปต์สำหรับ Modal ป๊อปอัป
+    // ----------------------------------------------------
     const addressModal = document.getElementById('addressModal');
-    const modalContent = addressModal.querySelector('.modal-content');
+    const cardModal = document.getElementById('cardModal');
 
     function openAddressModal() {
         addressModal.classList.remove('hidden');
         addressModal.classList.add('flex');
-        // ใส่ delay นิดนึงเพื่อให้ animation fade in ทำงาน
         setTimeout(() => {
             addressModal.classList.remove('opacity-0');
-            modalContent.classList.remove('scale-95');
+            addressModal.querySelector('.modal-content').classList.remove('scale-95');
         }, 10);
     }
 
     function closeAddressModal() {
         addressModal.classList.add('opacity-0');
-        modalContent.classList.add('scale-95');
-        // รอให้ animation เล่นจบแล้วค่อยซ่อน
+        addressModal.querySelector('.modal-content').classList.add('scale-95');
         setTimeout(() => {
             addressModal.classList.add('hidden');
             addressModal.classList.remove('flex');
         }, 300);
+    }
+
+    function openCardModal() {
+        cardModal.classList.remove('hidden');
+        cardModal.classList.add('flex');
+        setTimeout(() => {
+            cardModal.classList.remove('opacity-0');
+            cardModal.querySelector('.modal-content').classList.remove('scale-95');
+        }, 10);
+    }
+
+    function closeCardModal(isSave) {
+        cardModal.classList.add('opacity-0');
+        cardModal.querySelector('.modal-content').classList.add('scale-95');
+        setTimeout(() => {
+            cardModal.classList.add('hidden');
+            cardModal.classList.remove('flex');
+        }, 300);
+
+        if (!isSave) {
+            // ถ้ากดยกเลิก ให้เด้งกลับไปเลือก PromptPay
+            document.querySelector('input[value="promptpay"]').checked = true;
+            updatePaymentUI();
+        } else {
+            // ถ้ากดยืนยันเพิ่มบัตร (จำลองว่าบันทึกแล้ว)
+            const cardInput = document.querySelector('input[value="credit_card"]');
+            cardInput.setAttribute('data-has-card', 'true');
+            
+            // เพิ่มข้อความแสดงเลขบัตรจำลอง
+            const labelContent = cardInput.closest('label').querySelector('.flex-1');
+            if(!labelContent.querySelector('.text-green-500')){
+                labelContent.innerHTML += `<span class="text-[11px] text-green-500 font-bold block mt-0.5">ลงท้ายด้วย **** 1234 (VISA)</span>`;
+            }
+
+            Swal.fire({
+                toast: true, position: 'top-end', icon: 'success',
+                title: 'เพิ่มข้อมูลบัตรสำเร็จ', showConfirmButton: false, timer: 2000
+            });
+        }
     }
 </script>
 
