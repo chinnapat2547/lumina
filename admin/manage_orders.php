@@ -31,9 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // ==========================================
 if (isset($_GET['delete_id'])) {
     $del_id = (int)$_GET['delete_id'];
-    // ลบรายการย่อย, การชำระเงิน และออเดอร์หลัก
+    // ลบรายการย่อย และออเดอร์หลัก (เอา payment ออกเพราะใน DB ไม่มี order_id ในตาราง payment)
     mysqli_query($conn, "DELETE FROM `order_items` WHERE order_id = $del_id");
-    mysqli_query($conn, "DELETE FROM `payment` WHERE order_id = $del_id");
     mysqli_query($conn, "DELETE FROM `orders` WHERE order_id = $del_id");
     
     $_SESSION['success_msg'] = "ลบรายการสั่งซื้อเรียบร้อยแล้ว!";
@@ -52,15 +51,16 @@ if ($current_filter !== 'all') {
 }
 
 // ==========================================
-// 5. ดึงข้อมูลออเดอร์ทั้งหมด
+// 5. ดึงข้อมูลออเดอร์ทั้งหมด (แก้ไข SQL ให้ตรงกับ DB)
 // ==========================================
 $orders = [];
 $sqlOrders = "
-    SELECT o.*, a.u_username, a.u_name, u.u_phone, u.u_address, p.payment_method, p.slip_image 
+    SELECT o.*, a.u_username, a.u_name, u.u_phone, 
+           (SELECT CONCAT(address_line, ' ', district, ' ', province, ' ', zipcode) 
+            FROM user_address WHERE u_id = o.u_id ORDER BY is_default DESC LIMIT 1) as u_address
     FROM `orders` o 
     LEFT JOIN `account` a ON o.u_id = a.u_id 
     LEFT JOIN `user` u ON o.u_id = u.u_id
-    LEFT JOIN `payment` p ON o.order_id = p.order_id
     $whereClause
     ORDER BY o.created_at DESC
 ";
@@ -77,22 +77,29 @@ if ($resOrders = mysqli_query($conn, $sqlOrders)) {
             // ดึงรูปสินค้าจากตาราง product มาด้วย
             $p_id = $item['p_id'];
             $imgRes = mysqli_query($conn, "SELECT p_image FROM `product` WHERE p_id = $p_id");
-            $imgRow = mysqli_fetch_assoc($imgRes);
-            $item['p_image'] = $imgRow['p_image'] ?? '';
+            if ($imgRow = mysqli_fetch_assoc($imgRes)) {
+                $item['p_image'] = $imgRow['p_image'];
+            } else {
+                $item['p_image'] = '';
+            }
             $items[] = $item;
         }
         
         $row['items'] = $items;
+        // Mock ข้อมูลที่ยังไม่มีในฐานข้อมูล
+        $row['payment_method'] = 'ไม่ระบุ'; 
+        $row['slip_image'] = null; 
+        
         $orders[] = $row;
     }
 }
 
 // นับจำนวนตามสถานะสำหรับ Tab
-$countAll = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders`"))['c'];
-$countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'];
-$countProcessing = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='processing'"))['c'];
-$countShipped = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='shipped'"))['c'];
-$countCompleted = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='completed'"))['c'];
+$countAll = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders`"))['c'] ?? 0;
+$countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
+$countProcessing = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='processing'"))['c'] ?? 0;
+$countShipped = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='shipped'"))['c'] ?? 0;
+$countCompleted = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='completed'"))['c'] ?? 0;
 
 // ฟังก์ชันแปลงสถานะเป็น Badge สวยๆ
 function getStatusBadge($status) {
@@ -111,7 +118,7 @@ function getPaymentMethodText($method) {
     if ($method == 'promptpay' || $method == 'โอนเงิน') return ['text' => 'โอนเงิน', 'icon' => 'account_balance', 'color' => 'text-blue-500'];
     if ($method == 'credit_card') return ['text' => 'บัตรเครดิต', 'icon' => 'credit_card', 'color' => 'text-purple-500'];
     if ($method == 'cod') return ['text' => 'COD ปลายทาง', 'icon' => 'local_shipping', 'color' => 'text-orange-500'];
-    return ['text' => 'ยังไม่ระบุ', 'icon' => 'payments', 'color' => 'text-gray-400'];
+    return ['text' => 'ไม่ระบุ', 'icon' => 'payments', 'color' => 'text-gray-400'];
 }
 ?>
 <!DOCTYPE html>
@@ -441,12 +448,8 @@ function getPaymentMethodText($method) {
                                     <div class="font-bold text-sm bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg inline-block border border-blue-100" id="md_pay_method">โอนผ่านธนาคาร</div>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500 mb-0.5">ยอดโอน:</p>
+                                    <p class="text-xs text-gray-500 mb-0.5">ยอดชำระ:</p>
                                     <p class="font-bold text-primary text-lg" id="md_pay_amount">฿0.00</p>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-green-500 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100 w-fit">
-                                    <span class="material-icons-round text-[16px]">verified</span>
-                                    <span class="text-xs font-bold">ยืนยันการชำระเงินแล้ว</span>
                                 </div>
                             </div>
                         </div>
@@ -485,7 +488,7 @@ function getPaymentMethodText($method) {
                                 <span class="text-gray-500">ค่าจัดส่ง</span>
                                 <span class="font-bold text-gray-700" id="md_sum_shipping">฿0.00</span>
                             </div>
-                            </div>
+                        </div>
                         <div class="flex justify-between items-end pt-4">
                             <span class="font-bold text-gray-800">ยอดสุทธิ</span>
                             <span class="font-extrabold text-2xl text-primary tracking-tight" id="md_sum_total">฿0.00</span>
@@ -505,28 +508,22 @@ function getPaymentMethodText($method) {
 </div>
 
 <script>
-    // 🟢 แสดง/ซ่อน Modal 🟢
     function openOrderModal(jsonData) {
         const order = JSON.parse(jsonData);
         
-        // เซ็ต Header
         document.getElementById('md_order_no').innerText = '#' + order.order_no;
         
-        // รูปแบบวันที่
         const dateObj = new Date(order.created_at);
         const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
         document.getElementById('md_date').innerText = dateObj.toLocaleDateString('th-TH', options) + ' น.';
         
-        // ฟอร์มสถานะ
         document.getElementById('md_form_order_id').value = order.order_id;
         document.getElementById('md_status_select').value = order.status;
 
-        // ข้อมูลลูกค้า
         document.getElementById('md_cus_name').innerText = order.u_name || order.u_username;
         document.getElementById('md_cus_phone').innerText = order.u_phone || 'ไม่ระบุ';
         document.getElementById('md_cus_address').innerText = order.u_address || 'ไม่ระบุ';
 
-        // การชำระเงิน
         let payMethodText = 'ไม่ระบุ';
         if(order.payment_method === 'promptpay') payMethodText = 'โอนเงินผ่านธนาคาร (QR)';
         else if(order.payment_method === 'credit_card') payMethodText = 'บัตรเครดิต/เดบิต';
@@ -535,7 +532,6 @@ function getPaymentMethodText($method) {
         
         document.getElementById('md_pay_amount').innerText = '฿' + parseFloat(order.total_amount).toLocaleString('th-TH', {minimumFractionDigits: 2});
         
-        // รูปสลิป
         const slipImg = document.getElementById('md_slip_img');
         const slipNone = document.getElementById('md_slip_none');
         if (order.slip_image) {
@@ -548,7 +544,6 @@ function getPaymentMethodText($method) {
             slipNone.classList.remove('hidden');
         }
 
-        // รายการสินค้า (Render HTML)
         const itemsContainer = document.getElementById('md_items_container');
         itemsContainer.innerHTML = '';
         let itemsTotal = 0;
@@ -572,13 +567,11 @@ function getPaymentMethodText($method) {
             `;
         });
 
-        // สรุปยอดเงิน
-        const shippingCost = parseFloat(order.total_amount) - itemsTotal; // คำนวณย้อนกลับ
+        const shippingCost = parseFloat(order.total_amount) - itemsTotal; 
         document.getElementById('md_sum_items').innerText = '฿' + itemsTotal.toLocaleString('th-TH', {minimumFractionDigits: 2});
         document.getElementById('md_sum_shipping').innerText = '฿' + (shippingCost > 0 ? shippingCost.toLocaleString('th-TH', {minimumFractionDigits: 2}) : '0.00');
         document.getElementById('md_sum_total').innerText = '฿' + parseFloat(order.total_amount).toLocaleString('th-TH', {minimumFractionDigits: 2});
 
-        // เปิด Modal
         const modal = document.getElementById('orderModal');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -598,7 +591,6 @@ function getPaymentMethodText($method) {
         }, 300);
     }
 
-    // 🟢 ระบบลบ 🟢
     function confirmDelete(id) {
         Swal.fire({
             title: 'ยืนยันการลบออเดอร์?',
@@ -617,7 +609,6 @@ function getPaymentMethodText($method) {
         });
     }
 
-    // แจ้งเตือนเมื่อทำงานสำเร็จ
     <?php if (isset($_SESSION['success_msg'])): ?>
         Swal.fire({ 
             toast: true, position: 'top-end', icon: 'success', 

@@ -21,7 +21,7 @@ if (isset($_GET['delete_id'])) {
     // ลบข้อมูลที่เกี่ยวข้อง (ควรเช็ค FK constraints ในฐานข้อมูลด้วย)
     mysqli_query($conn, "DELETE FROM `cart` WHERE u_id = $del_id");
     mysqli_query($conn, "DELETE FROM `user_address` WHERE u_id = $del_id");
-    mysqli_query($conn, "DELETE FROM `user_card` WHERE u_id = $del_id");
+    mysqli_query($conn, "DELETE FROM `payment` WHERE u_id = $del_id"); // แก้จาก user_card เป็น payment
     mysqli_query($conn, "DELETE FROM `user` WHERE u_id = $del_id");
     mysqli_query($conn, "DELETE FROM `account` WHERE u_id = $del_id");
     // หมายเหตุ: โดยปกติรายการสั่งซื้อ (orders) จะไม่ถูกลบเมื่อลบลูกค้า แต่จะเซ็ต u_id = NULL หรือปล่อยไว้เพื่อเก็บสถิติ
@@ -40,17 +40,19 @@ $stat_silver = 0;
 $stat_bronze = 0;
 $stat_new = 0; // สมัครในเดือนนี้
 
-// คำสั่ง SQL ดึงข้อมูลลูกค้า + ยอดสั่งซื้อรวม + จำนวนออเดอร์
+// คำสั่ง SQL ดึงข้อมูลลูกค้า + ยอดสั่งซื้อรวม + จำนวนออเดอร์ (แก้ให้ตรงกับฐานข้อมูลจริง)
 $sqlCustomers = "
-    SELECT a.u_id, a.u_username, a.u_email, a.u_name, a.created_at, 
-           u.u_image, u.u_phone, u.u_address,
+    SELECT a.u_id, a.u_username, a.u_email, a.u_name, u.created_at, 
+           u.u_image, u.u_phone, 
+           (SELECT CONCAT(address_line, ' ', district, ' ', province, ' ', zipcode) 
+            FROM user_address WHERE u_id = a.u_id ORDER BY is_default DESC LIMIT 1) as u_address,
            COUNT(o.order_id) as total_orders,
            SUM(CASE WHEN o.status != 'cancelled' THEN o.total_amount ELSE 0 END) as total_spent
     FROM `account` a
     LEFT JOIN `user` u ON a.u_id = u.u_id
     LEFT JOIN `orders` o ON a.u_id = o.u_id
-    GROUP BY a.u_id
-    ORDER BY a.created_at DESC
+    GROUP BY a.u_id, a.u_username, a.u_email, a.u_name, u.created_at, u.u_image, u.u_phone
+    ORDER BY u.created_at DESC
 ";
 
 if ($res = mysqli_query($conn, $sqlCustomers)) {
@@ -477,7 +479,7 @@ function getStatusBadge($status) {
                                     </tr>
                                 </thead>
                                 <tbody class="text-sm" id="md_orders_body">
-                                    </tbody>
+                                </tbody>
                             </table>
                         </div>
                     </div>
