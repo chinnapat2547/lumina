@@ -250,9 +250,9 @@ function getPaymentMethodIcon($method) {
 
 <main class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
     
-    <div class="flex flex-col mb-6 gap-3">
-        <a href="orders.php" class="inline-flex items-center gap-1 text-sm font-bold text-gray-500 hover:text-primary transition w-fit">
-            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับไปประวัติการสั่งซื้อ
+    <div class="flex flex-col mb-6 gap-2">
+        <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
+            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
         </a>
         <div>
             <div class="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
