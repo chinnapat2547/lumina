@@ -5,34 +5,48 @@ require_once '../config/connectdbuser.php';
 // ==========================================
 // 1. ตรวจสอบการล็อกอิน และดึงข้อมูลผู้ใช้เบื้องต้น
 // ==========================================
-if (!isset($_SESSION['u_id'])) {
-    header("Location: ../auth/login.php");
-    exit();
-}
-
-$u_id = $_SESSION['u_id'];
-$isLoggedIn = true;
-$isAdmin = isset($_SESSION['admin_id']) ? true : false;
+$isLoggedIn = false;
+$isAdmin = false;
 $userData = ['u_username' => 'ผู้ใช้งาน', 'u_email' => ''];
 $profileImage = "https://ui-avatars.com/api/?name=User&background=F43F85&color=fff";
+$totalCartItems = 0; // ประกาศรอไว้สำหรับโชว์ใน Navbar
 
-$sqlUser = "SELECT a.u_username, a.u_email, a.u_name, u.u_image, u.u_phone, u.u_address 
-            FROM `account` a 
-            LEFT JOIN `user` u ON a.u_id = u.u_id 
-            WHERE a.u_id = ?";
-if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
-    mysqli_stmt_bind_param($stmtUser, "i", $u_id);
-    mysqli_stmt_execute($stmtUser);
-    $resultUser = mysqli_stmt_get_result($stmtUser);
-    if ($rowUser = mysqli_fetch_assoc($resultUser)) {
-        $userData = $rowUser;
-        if (!empty($rowUser['u_image']) && file_exists("../profile/uploads/" . $rowUser['u_image'])) {
-            $profileImage = "../profile/uploads/" . $rowUser['u_image'];
-        } else {
-            $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($rowUser['u_username']) . "&background=F43F85&color=fff";
+// ตรวจสอบว่าเป็น Admin หรือ User ธรรมดา
+if (isset($_SESSION['admin_id'])) {
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $u_id = $_SESSION['admin_id']; // กัน Error ใน Query ด้านล่าง
+    $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
+    $userData['u_email'] = 'Administrator Mode';
+    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+} elseif (isset($_SESSION['u_id'])) {
+    $isLoggedIn = true;
+    $u_id = $_SESSION['u_id'];
+    
+    $sqlUser = "SELECT a.u_username, a.u_email, a.u_name, u.u_image, u.u_phone, u.u_address 
+                FROM `account` a 
+                LEFT JOIN `user` u ON a.u_id = u.u_id 
+                WHERE a.u_id = ?";
+    if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
+        mysqli_stmt_bind_param($stmtUser, "i", $u_id);
+        mysqli_stmt_execute($stmtUser);
+        $resultUser = mysqli_stmt_get_result($stmtUser);
+        if ($rowUser = mysqli_fetch_assoc($resultUser)) {
+            $userData = $rowUser;
+            // ดึงรูปโปรไฟล์ให้ถูกต้อง
+            $physical_path = __DIR__ . "/../profile/uploads/" . $userData['u_image'];
+            if (!empty($userData['u_image']) && file_exists($physical_path)) {
+                $profileImage = "../profile/uploads/" . $userData['u_image'];
+            } else {
+                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($rowUser['u_username']) . "&background=F43F85&color=fff";
+            }
         }
+        mysqli_stmt_close($stmtUser);
     }
-    mysqli_stmt_close($stmtUser);
+} else {
+    // ไม่มี Session ใดๆ ให้เด้งกลับไป Login
+    header("Location: ../auth/login.php");
+    exit();
 }
 
 // ==========================================
@@ -242,9 +256,43 @@ if ($netTotal < 0) $netTotal = 0;
                 <div class="relative group flex items-center">
                     <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=F43F85&color=fff'"/>
+                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=ec2d88&color=fff'"/>
                         </div>
                     </a>
+                    
+                    <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
+                        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
+                            <div class="text-center mb-4">
+                                <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
+                                    <?= $isAdmin ? 'Administrator Mode' : htmlspecialchars($userData['u_email'] ?? '') ?>
+                                </span>
+                            </div>
+                            <div class="flex justify-center relative mb-4">
+                                <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
+                                    <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
+                                        <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center mt-2 mb-6">
+                                <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username'] ?? 'User') ?></h3>
+                            </div>
+                            <div class="flex flex-col gap-3 mt-2">
+                                <?php if($isAdmin): ?>
+                                    <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                        <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+                                    </a>
+                                <?php else: ?>
+                                    <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                        จัดการบัญชี
+                                    </a>
+                                <?php endif; ?>
+                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -541,36 +589,34 @@ if ($netTotal < 0) $netTotal = 0;
             </button>
         </div>
         
-        <div class="p-6 bg-white dark:bg-gray-800 space-y-5">
-            <div>
-                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">หมายเลขบัตร (Card Number)</label>
-                <div class="relative">
-                    <span class="absolute left-4 top-3 text-gray-400 material-icons-round text-xl">credit_card</span>
-                    <input type="text" id="newCardNumber" placeholder="0000 0000 0000 0000" maxlength="19" class="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white font-mono">
+        <form action="payment.php" method="POST">
+            <div class="p-6 bg-white dark:bg-gray-800 space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">หมายเลขบัตร (Card Number)</label>
+                    <input type="text" name="cardNumber" id="cardNumber" placeholder="0000 0000 0000 0000" maxlength="19" required class="w-full form-input font-mono">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">ชื่อบนบัตร (Cardholder Name)</label>
+                    <input type="text" name="cardName" placeholder="NAME LASTNAME" required class="w-full form-input uppercase">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">วันหมดอายุ</label>
+                        <input type="text" name="cardExpiry" id="cardExpiry" placeholder="MM/YY" maxlength="5" required class="w-full form-input font-mono text-center">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">รหัส CVV</label>
+                        <input type="password" name="cardCvv" placeholder="•••" maxlength="3" required class="w-full form-input font-mono tracking-widest text-center">
+                    </div>
                 </div>
             </div>
             
-            <div>
-                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">ชื่อบนบัตร (Card Holder Name)</label>
-                <input type="text" placeholder="ชื่อ - นามสกุล" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white">
+            <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
+                <button type="button" onclick="closeCardFormModal()" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 transition-colors">ยกเลิก</button>
+                <button type="submit" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-lg shadow-primary/30 transition-transform transform hover:-translate-y-0.5">เพิ่มบัตรนี้</button>
             </div>
+        </form>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">วันหมดอายุ (MM/YY)</label>
-                    <input type="text" placeholder="MM/YY" maxlength="5" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white text-center font-mono">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">รหัส (CVV)</label>
-                    <input type="password" placeholder="***" maxlength="3" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white text-center font-mono tracking-widest">
-                </div>
-            </div>
-        </div>
-        
-        <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
-            <button type="button" onclick="closeCardFormModal()" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 transition-colors">ยกเลิก</button>
-            <button type="button" onclick="saveNewCard()" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-lg shadow-primary/30 transition-transform transform hover:-translate-y-0.5">ใช้บัตรนี้</button>
-        </div>
     </div>
 </div>
 

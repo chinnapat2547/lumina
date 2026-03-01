@@ -414,7 +414,7 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">ชื่อบนบัตร (Cardholder Name)</label>
-                    <input type="text" name="cardName" placeholder="KIW LUMINA" required class="form-input uppercase">
+                    <input type="text" name="cardName" placeholder="NAME LASTNAME" required class="form-input uppercase">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
