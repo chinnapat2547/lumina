@@ -211,8 +211,8 @@ $stat_total = count($customers);
                         <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
                         <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
                     </div>
-                    <?php if($countPending > 0): ?>
-                        <span class="bg-primary text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $countPending ?></span>
+                    <?php if($newOrders > 0): ?>
+                        <span class="bg-primary text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newOrders ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="manage_customers.php">
