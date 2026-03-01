@@ -159,7 +159,7 @@ $activeTab = $_GET['tab'] ?? 'store';
                 <span class="text-xs font-bold text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full ml-1">Admin</span>
             </a>
             <nav class="flex flex-col gap-2">
-                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="#">
+                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="dashboard.php">
                     <span class="material-icons-round">dashboard</span>
                     <span class="font-bold text-[15px]">ภาพรวมระบบ</span>
                 </a>

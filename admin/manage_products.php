@@ -311,7 +311,7 @@ while($p = mysqli_fetch_assoc($resProd)) {
             </a>
             
             <nav class="flex flex-col gap-2">
-                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="#">
+                <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="dashboard.php">
                     <span class="material-icons-round">dashboard</span>
                     <span class="font-bold text-[15px]">ภาพรวมระบบ</span>
                 </a>
