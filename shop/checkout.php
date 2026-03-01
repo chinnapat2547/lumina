@@ -562,7 +562,7 @@ if ($netTotal < 0) $netTotal = 0;
                 </label>
                 <?php endforeach; ?>
                 
-                <a href="payment.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-4 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group mt-2">
+                <a href="/../profile/payment.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-4 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group mt-2">
                     <span class="font-bold text-sm text-gray-600 dark:text-gray-300 group-hover:text-primary flex items-center justify-center gap-2">
                         <span class="material-icons-round text-lg">add_circle_outline</span> เพิ่มบัตรเครดิต/เดบิตใบใหม่
                     </span>
