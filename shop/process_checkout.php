@@ -362,16 +362,16 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                 <div class="w-40 h-40 bg-white mx-auto rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center p-2 relative">
-                    <img src="../profile/qr.JPEG" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
+                    <img src="qr.JPEG" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
                     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-sm border border-gray-100">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/PromptPay_logo.svg/1024px-PromptPay_logo.svg.png" class="h-4">
+                        <img src="qr.JPEG" class="h-4">
                     </div>
                 </div>
 
                 <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm text-left h-full flex flex-col justify-center border border-gray-100 dark:border-gray-600">
                     <div class="flex items-center gap-2 mb-3">
-                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                            <span class="material-icons-round text-primary text-sm">account_balance</span>
+                        <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                            <span class="material-icons-round text-white text-sm">account_balance</span>
                         </div>
                         <span class="font-bold text-gray-800 dark:text-white">ธนาคารกรุงเทพ</span>
                     </div>
@@ -464,32 +464,61 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
+    // ฟังก์ชันพรีวิวและตรวจสอบไฟล์สลิป
     function previewFileName(input) {
         const textSpan = document.getElementById('fileNameText');
         const uploadArea = input.closest('.upload-area');
+        
         if (input.files && input.files[0]) {
-            
-            // ดักจับขนาดไฟล์ด้วย JS ก่อนส่งไป PHP ช่วยลดภาระเซิร์ฟเวอร์
-            if(input.files[0].size > 2097152){
-                alert("ขนาดไฟล์ใหญ่เกิน 2MB กรุณาเลือกไฟล์ใหม่");
-                input.value = "";
-                textSpan.textContent = "คลิกเพื่ออัปโหลดสลิปโอนเงิน";
-                textSpan.classList.remove('text-primary');
-                uploadArea.classList.remove('active', 'bg-pink-50/50', 'border-primary');
-                uploadArea.classList.add('bg-white');
+            const file = input.files[0];
+            const fileSize = file.size;
+            const fileType = file.type;
+            const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+            // 1. ตรวจสอบนามสกุล/ประเภทไฟล์
+            if (!validTypes.includes(fileType)) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'รูปแบบไฟล์ไม่รองรับ',
+                    text: 'กรุณาอัปโหลดเฉพาะไฟล์รูปภาพ (JPG, JPEG, PNG, WEBP) เท่านั้น',
+                    confirmButtonColor: '#ec2d88',
+                    customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-full px-6' }
+                });
+                resetUploadUI(input, textSpan, uploadArea);
+                return;
+            }
+
+            // 2. ตรวจสอบขนาดไฟล์ (ไม่เกิน 2MB = 2097152 Bytes)
+            if (fileSize > 2097152) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ขนาดไฟล์ใหญ่เกินไป',
+                    text: 'กรุณาเลือกไฟล์สลิปที่มีขนาดไม่เกิน 2MB',
+                    confirmButtonColor: '#ec2d88',
+                    customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-full px-6' }
+                });
+                resetUploadUI(input, textSpan, uploadArea);
                 return;
             }
             
-            textSpan.textContent = "อัปโหลดแล้ว: " + input.files[0].name;
+            // ถ้าผ่านทุกเงื่อนไข ให้เปลี่ยนสีกรอบเป็นสีชมพู
+            textSpan.textContent = "อัปโหลดแล้ว: " + file.name;
             textSpan.classList.add('text-primary');
             uploadArea.classList.add('active', 'bg-pink-50/50', 'border-primary');
             uploadArea.classList.remove('bg-white');
+            
         } else {
-            textSpan.textContent = "คลิกเพื่ออัปโหลดสลิปโอนเงิน";
-            textSpan.classList.remove('text-primary');
-            uploadArea.classList.remove('active', 'bg-pink-50/50', 'border-primary');
-            uploadArea.classList.add('bg-white');
+            resetUploadUI(input, textSpan, uploadArea);
         }
+    }
+
+    // ฟังก์ชันช่วยรีเซ็ตหน้าตาปุ่มอัปโหลดกลับเป็นแบบเดิม
+    function resetUploadUI(input, textSpan, uploadArea) {
+        input.value = "";
+        textSpan.textContent = "คลิกเพื่ออัปโหลดสลิปโอนเงิน";
+        textSpan.classList.remove('text-primary');
+        uploadArea.classList.remove('active', 'bg-pink-50/50', 'border-primary');
+        uploadArea.classList.add('bg-white');
     }
 </script>
 </body></html>

@@ -452,7 +452,7 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
         </div>
         <div class="mb-4">
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">ชื่อบัญชี</p>
-            <p class="font-bold text-lg text-gray-800 dark:text-white">นายชินพัฒน์ ลิ่มดิลกธรรม</p>
+            <p class="font-bold text-lg text-gray-800 dark:text-white">ชื่อบัญชี: บจก. ลูมิน่า บิวตี้</p>
         </div>
         <div>
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">พร้อมเพย์</p>
