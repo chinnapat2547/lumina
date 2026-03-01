@@ -359,11 +359,18 @@ while($p = mysqli_fetch_assoc($resProd)) {
                 <span class="font-bold text-xl text-primary flex items-center gap-1"><span class="material-icons-round">spa</span> Lumina</span>
             </div>
             
-            <form method="GET" action="" class="hidden md:flex flex-1 max-w-md relative group">
-                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <span class="material-icons-round text-gray-400 group-focus-within:text-primary transition-colors text-[20px]">search</span>
+            <form method="GET" action="manage_products.php" class="hidden md:flex flex-1 max-w-md relative group items-center gap-2">
+                <div class="relative w-full">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <span class="material-icons-round text-gray-400 group-focus-within:text-primary transition-colors text-[20px]">search</span>
+                    </div>
+                    <input name="search" value="<?= htmlspecialchars($search ?? '') ?>" class="block w-full pl-12 pr-4 py-2.5 rounded-full border border-pink-100 bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 transition-all outline-none" placeholder="ค้นหาสินค้า (ชื่อ, รหัส, หมวดหมู่)..." type="text"/>
                 </div>
-                <input name="search" value="<?= htmlspecialchars($search) ?>" class="block w-full pl-12 pr-4 py-2.5 rounded-full border border-pink-100 bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 transition-all outline-none" placeholder="ค้นหาสินค้า (ชื่อ, รหัส, หมวดหมู่)..." type="text"/>
+                <?php if (!empty($search)): ?>
+                    <a href="manage_products.php" class="w-10 h-10 bg-pink-50 hover:bg-red-100 text-primary hover:text-red-500 rounded-full transition-colors flex items-center justify-center shadow-sm flex-shrink-0" title="ล้างการค้นหา">
+                        <span class="material-icons-round text-[20px]">close</span>
+                    </a>
+                <?php endif; ?>
                 <button type="submit" class="hidden"></button> </form>
             
             <div class="flex items-center gap-4 lg:gap-6 ml-auto">
@@ -436,20 +443,20 @@ while($p = mysqli_fetch_assoc($resProd)) {
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr class="bg-gray-50/80 text-gray-500 text-sm uppercase tracking-wider border-b border-gray-100">
-                                <th class="px-6 py-5 font-bold pl-8">รูปภาพ</th>
+                            <tr class="bg-gray-50/80 text-gray-600 text-[15px] uppercase tracking-wider border-b border-gray-100">
+                                <th class="px-6 py-5 font-bold pl-8 text-center">รูปภาพ</th>
                                 <th class="px-6 py-5 font-bold w-1/3">ชื่อสินค้า / SKU</th>
-                                <th class="px-6 py-5 font-bold">หมวดหมู่</th>
-                                <th class="px-6 py-5 font-bold">ราคา</th>
+                                <th class="px-6 py-5 font-bold text-center">หมวดหมู่</th>
+                                <th class="px-6 py-5 font-bold text-center">ราคา</th>
                                 <th class="px-6 py-5 font-bold text-center">สต็อก</th>
                                 <th class="px-6 py-5 font-bold text-center">สถานะ</th>
-                                <th class="px-6 py-5 font-bold text-right pr-8">จัดการ</th>
+                                <th class="px-6 py-5 font-bold text-center pr-8">จัดการ</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             <?php if (empty($products)): ?>
                             <tr>
-                                <td colspan="7" class="text-center py-10 text-gray-500">ไม่พบสินค้าที่คุณค้นหา</td>
+                                <td colspan="7" class="text-center py-10 text-gray-500 text-base">ไม่พบสินค้าที่คุณค้นหา</td>
                             </tr>
                             <?php endif; ?>
                             
@@ -457,10 +464,18 @@ while($p = mysqli_fetch_assoc($resProd)) {
                                 $img = (!empty($p['p_image']) && file_exists("../uploads/products/".$p['p_image'])) 
                                     ? "../uploads/products/".$p['p_image'] 
                                     : "https://placehold.co/150x150/fce7f3/ec2d88?text=No+Image";
+                                    
+                                // 🟢 เงื่อนไขสีของสต็อก
+                                $stockColor = 'text-green-500'; // มากกว่า 1000 สีเขียว
+                                if ($p['p_stock'] <= 100) {
+                                    $stockColor = 'text-red-500'; // น้อยกว่าหรือเท่ากับ 100 สีแดง
+                                } elseif ($p['p_stock'] <= 1000) {
+                                    $stockColor = 'text-yellow-500'; // น้อยกว่าหรือเท่ากับ 1000 สีเหลือง
+                                }
                             ?>
                             <tr class="hover:bg-pink-50/30 transition-colors group">
-                                <td class="px-6 py-4 pl-8">
-                                    <div class="w-24 h-24 rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
+                                <td class="px-6 py-4 pl-8 text-center">
+                                    <div class="w-24 h-24 mx-auto rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
                                         <img src="<?= $img ?>" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
                                     </div>
                                 </td>
@@ -470,15 +485,15 @@ while($p = mysqli_fetch_assoc($resProd)) {
                                         <span class="text-sm text-gray-400 font-mono bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">SKU: <?= htmlspecialchars($p['p_sku'] ?: '-') ?></span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-4 text-center">
                                     <span class="inline-flex px-4 py-1.5 rounded-2xl text-xs font-bold bg-pink-50 text-primary border border-pink-100 shadow-sm text-center leading-relaxed">
                                         <?= preg_replace('/ ?\(/', '<br>(', htmlspecialchars($p['c_name'] ?? 'ไม่มีหมวดหมู่')) ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 font-black text-primary text-xl">฿<?= number_format($p['p_price'], 2) ?></td>
+                                <td class="px-6 py-4 text-center font-black text-primary text-xl">฿<?= number_format($p['p_price'], 2) ?></td>
                                 
                                 <td class="px-6 py-4 text-center">
-                                    <span class="text-2xl font-extrabold <?= $p['p_stock'] <= 10 ? 'text-red-500' : 'text-gray-800' ?>"><?= $p['p_stock'] ?></span>
+                                    <span class="text-2xl font-extrabold <?= $stockColor ?>"><?= $p['p_stock'] ?></span>
                                 </td>
                                 
                                 <td class="px-6 py-4 text-center">
@@ -488,8 +503,8 @@ while($p = mysqli_fetch_assoc($resProd)) {
                                     </label>
                                 </td>
                                 
-                                <td class="px-6 py-4 pr-8">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-6 py-4 pr-8 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                         <button 
                                             data-product="<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>"
                                             data-img="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8') ?>"
