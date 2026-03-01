@@ -258,13 +258,14 @@ function getPaymentMethodIcon($method) {
                 <a href="orders.php" class="hover:text-primary transition">ประวัติการสั่งซื้อ</a>
                 <span class="material-icons-round text-[14px]">chevron_right</span>
                 <span class="text-primary font-bold">รายละเอียด</span>
+
+                <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
+                    <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
+                </a>
             </div>
             <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">คำสั่งซื้อ #<?= htmlspecialchars($order['order_no']) ?></h1>
             <p class="text-gray-500 dark:text-gray-400 text-sm">สั่งซื้อเมื่อ <?= $formatted_date ?></p>
         </div>
-        <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
-            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
-        </a>
     </div>
 
     <div class="<?= $badge['color'] ?> border rounded-[2rem] p-6 mb-8 flex items-center gap-4 shadow-sm">
