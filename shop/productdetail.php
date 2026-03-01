@@ -6,12 +6,20 @@ require_once '../config/connectdbuser.php';
 // 1. จัดการข้อมูลผู้ใช้และตะกร้า (สำหรับ Navbar)
 // ==========================================
 $isLoggedIn = false;
+$isAdmin = false;
 $profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
 $userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
 $totalCartItems = 0;
-$isAdmin = isset($_SESSION['admin_id']) ? true : false;
 
-if (isset($_SESSION['u_id'])) {
+// 🟢 แก้ไข: ตรวจสอบ Session ของ Admin ก่อน 🟢
+if (isset($_SESSION['admin_id'])) {
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
+    $userData['u_email'] = 'Administrator Mode';
+    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    
+} elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
     $u_id = $_SESSION['u_id'];
     
@@ -21,12 +29,11 @@ if (isset($_SESSION['u_id'])) {
         mysqli_stmt_bind_param($stmtUser, "i", $u_id);
         mysqli_stmt_execute($stmtUser);
         $resultUser = mysqli_stmt_get_result($stmtUser);
+        
         if ($rowUser = mysqli_fetch_assoc($resultUser)) {
             $userData = $rowUser;
             
-            // ใช้ __DIR__ เจาะจง Path ไปที่โฟลเดอร์ profile/uploads/ ให้ชัวร์ 100%
             $physical_path = __DIR__ . "/../profile/uploads/" . $userData['u_image'];
-            
             if (!empty($userData['u_image']) && file_exists($physical_path)) {
                 $profileImage = "../profile/uploads/" . $userData['u_image'];
             } else {

@@ -38,13 +38,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // การทำงานปกติของหน้า Favorites (โหลดหน้าเว็บ)
 // ==========================================
 $isLoggedIn = false;
+$isAdmin = false;
 $profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
 $userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
 $favoriteProducts = []; 
 $totalCartItems = 0;
-$isAdmin = isset($_SESSION['admin_id']) ? true : false;
 
-if (isset($_SESSION['u_id'])) {
+// 🟢 แก้ไข: เพิ่มการตรวจสอบ Session ของ Admin 🟢
+if (isset($_SESSION['admin_id'])) {
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
+    $userData['u_email'] = 'Administrator Mode';
+    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    
+} elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
     $u_id = $_SESSION['u_id'];
     
@@ -229,30 +237,6 @@ if (isset($_SESSION['u_id'])) {
                 <span class="material-icons-round text-primary text-4xl">spa</span>
                 <span class="font-bold text-2xl tracking-tight text-primary font-display">Lumina</span>
             </a>
-            
-            <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-10">
-                <a class="group flex flex-col items-center justify-center transition" href="products.php">
-                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">สินค้า</span>
-                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Shop)</span>
-                </a>
-                <div class="relative group">
-                    <button class="flex flex-col items-center justify-center transition pb-1 pt-1">
-                        <div class="flex items-center gap-1">
-                            <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">หมวดหมู่</span>
-                            <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
-                        </div>
-                        <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Categories)</span>
-                    </button>
-                </div>
-                <a class="group flex flex-col items-center justify-center transition" href="promotions.php">
-                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">โปรโมชั่น</span>
-                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Sale)</span>
-                </a>
-                <a class="group flex flex-col items-center justify-center transition" href="../contact.php">
-                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">ติดต่อเรา</span>
-                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Contact)</span>
-                </a>
-            </div>
 
             <div class="flex items-center space-x-2 sm:space-x-4">
                 
