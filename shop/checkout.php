@@ -26,8 +26,8 @@ if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
     $resultUser = mysqli_stmt_get_result($stmtUser);
     if ($rowUser = mysqli_fetch_assoc($resultUser)) {
         $userData = $rowUser;
-        if (!empty($rowUser['u_image']) && file_exists("../uploads/" . $rowUser['u_image'])) {
-            $profileImage = "../uploads/" . $rowUser['u_image'];
+        if (!empty($rowUser['u_image']) && file_exists("../profile/uploads/" . $rowUser['u_image'])) {
+            $profileImage = "../profile/uploads/" . $rowUser['u_image'];
         } else {
             $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($rowUser['u_username']) . "&background=F43F85&color=fff";
         }
@@ -42,6 +42,7 @@ $addresses = [];
 $userFullName = $userData['u_name'] ?? $userData['u_username'];
 $userPhone = "ยังไม่ได้ระบุเบอร์โทรศัพท์";
 $userAddress = "ยังไม่ได้ระบุที่อยู่จัดส่ง กรุณาเพิ่มที่อยู่ในหน้าโปรไฟล์";
+$hasAddress = false; // 🟢 ตัวแปรสำหรับเช็คว่ามีที่อยู่หรือไม่ 🟢
 
 $sqlAddr = "SELECT * FROM `user_address` WHERE u_id = ? ORDER BY is_default DESC, created_at DESC";
 if ($stmtAddr = mysqli_prepare($conn, $sqlAddr)) {
@@ -56,13 +57,19 @@ if ($stmtAddr = mysqli_prepare($conn, $sqlAddr)) {
 
 // ถ้ามีที่อยู่ในระบบ ให้เอาที่อยู่แรก (หรือ default) มาเป็นค่าเริ่มต้น
 if (count($addresses) > 0) {
+    $hasAddress = true;
     $userFullName = $addresses[0]['recipient_name'];
     $userPhone = $addresses[0]['phone'];
     $userAddress = $addresses[0]['address_line'] . ' ' . $addresses[0]['district'] . ' ' . $addresses[0]['province'] . ' ' . $addresses[0]['zipcode'];
 } else {
     // ถ้าไม่มีใน user_address ให้ดึงจากตาราง user แทน
-    if (!empty($userData['u_phone'])) $userPhone = $userData['u_phone'];
-    if (!empty($userData['u_address'])) $userAddress = $userData['u_address'];
+    if (!empty($userData['u_phone'])) {
+        $userPhone = $userData['u_phone'];
+    }
+    if (!empty($userData['u_address'])) {
+        $userAddress = $userData['u_address'];
+        $hasAddress = true;
+    }
 }
 
 // ==========================================
@@ -82,6 +89,11 @@ if ($stmtCard = mysqli_prepare($conn, $sqlCard)) {
 }
 if(count($savedCards) > 0) {
     $hasSavedCard = true;
+    $savedCardLast4 = $savedCards[0]['card_last4'];
+    $savedCardType = $savedCards[0]['card_type'];
+} else {
+    $savedCardLast4 = 'XXXX';
+    $savedCardType = 'VISA';
 }
 
 // ==========================================
@@ -91,7 +103,7 @@ $cartItems = [];
 $subtotal = 0;
 $totalCartItems = 0;
 
-$sqlCart = "SELECT c.cart_id, c.quantity, p.p_id, p.p_name, p.p_price, p.p_image 
+$sqlCart = "SELECT c.cart_id, c.quantity, c.selected_color, p.p_id, p.p_name, p.p_price, p.p_image 
             FROM `cart` c 
             JOIN `product` p ON c.p_id = p.p_id 
             WHERE c.u_id = ?";
@@ -113,14 +125,20 @@ if (count($cartItems) === 0) {
     exit();
 }
 
-// 🟢 เงื่อนไขค่าส่งใหม่: ครบ 1000 ส่งฟรี/ด่วนลด 50
 $isFreeShippingEligible = ($subtotal >= 1000);
 $standardCost = $isFreeShippingEligible ? 0 : 50;
 $expressCost = $isFreeShippingEligible ? 50 : 100;
 
-$shippingCost = $standardCost; // เริ่มต้นที่ส่งธรรมดา
+$shippingCost = $standardCost; 
 $discount = 0; 
+
+// 🟢 แก้ที่ 5: เพิ่มตัวแปรสำหรับรับส่วนลด (จำลองไว้ก่อน)
+if (isset($_SESSION['applied_discount_amount'])) {
+    $discount = $_SESSION['applied_discount_amount']; 
+}
+
 $netTotal = $subtotal + $shippingCost - $discount;
+if ($netTotal < 0) $netTotal = 0; 
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -130,6 +148,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script id="tailwind-config">
     tailwind.config = {
@@ -221,70 +240,17 @@ $netTotal = $subtotal + $shippingCost - $discount;
                 </button>
                 
                 <div class="relative group flex items-center">
-                <a href="<?= $isAdmin ? 'admin/dashboard.php' : 'profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
-                    <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                        <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
-                    </div>
-                </a>
-                
-                <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
-                    <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
-                        
-                        <div class="text-center mb-4">
-                            <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
-                                <?= $isLoggedIn ? htmlspecialchars($userData['u_email']) : 'กรุณาเข้าสู่ระบบเพื่อใช้งาน' ?>
-                            </span>
+                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                        <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
+                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=F43F85&color=fff'"/>
                         </div>
-
-                        <div class="flex justify-center relative mb-4">
-                            <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
-                                <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
-                                    <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="text-center mt-2 mb-6">
-                            <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username']) ?></h3>
-                        </div>
-
-                        <div class="flex flex-col gap-3 mt-2">
-                            <?php if($isAdmin): ?>
-                                <a href="admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
-                                    <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
-                                </a>
-                                <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
-                                </a>
-                            <?php elseif($isLoggedIn): ?>
-                                <a href="profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    จัดการบัญชี
-                                </a>
-                                <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
-                                </a>
-                            <?php else: ?>
-                                <a href="auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
-                                </a>
-                                <a href="auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
-                                </a>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="flex justify-center items-center gap-2 mt-5 text-[11px] text-gray-400">
-                            <a href="#" class="hover:text-primary">นโยบายความเป็นส่วนตัว</a>
-                            <span>•</span>
-                            <a href="#" class="hover:text-primary">ข้อกำหนดบริการ</a>
-                        </div>
-                    </div>
+                    </a>
                 </div>
-            </div>
             </div>
         </div>
     </div>
 </header>
+
 <main class="max-w-7xl mx-auto w-full px-4 pb-16 lg:px-16">
     <div class="mb-10 mt-4">
         <div class="flex items-center justify-between max-w-3xl mx-auto relative">
@@ -312,7 +278,8 @@ $netTotal = $subtotal + $shippingCost - $discount;
         </div>
     </div>
 
-    <form action="process_checkout.php" method="POST" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <form action="process_checkout.php" method="POST" id="checkoutForm" onsubmit="return validateCheckout()" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <input type="hidden" id="hasAddressFlag" value="<?= $hasAddress ? 'true' : 'false' ?>">
         
         <div class="lg:col-span-2 space-y-6">
             
@@ -338,7 +305,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
                             <span id="displayPhone"><?= htmlspecialchars($userPhone) ?></span>
                         </span>
                     </p>
-                    <p id="displayAddress" class="text-gray-600 dark:text-gray-300 text-sm mt-3 leading-relaxed">
+                    <p id="displayAddress" class="text-gray-600 dark:text-gray-300 text-sm mt-3 leading-relaxed <?= !$hasAddress ? 'text-red-500 font-medium' : '' ?>">
                         <?= htmlspecialchars($userAddress) ?>
                     </p>
                 </div>
@@ -442,7 +409,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
                     <span class="material-icons-round text-primary">receipt_long</span> สรุปรายการสั่งซื้อ
                 </h2>
                 
-                <div class="space-y-5 mb-6 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                <div class="space-y-5 mb-6 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
                     <?php foreach($cartItems as $item): 
                         $imgUrl = (!empty($item['p_image']) && file_exists("../uploads/products/".$item['p_image'])) 
                                   ? "../uploads/products/".$item['p_image'] 
@@ -455,6 +422,9 @@ $netTotal = $subtotal + $shippingCost - $discount;
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col justify-center">
                             <p class="text-sm font-bold text-gray-800 dark:text-white truncate" title="<?= htmlspecialchars($item['p_name']) ?>"><?= htmlspecialchars($item['p_name']) ?></p>
+                            <?php if(!empty($item['selected_color'])): ?>
+                                <p class="text-[10px] text-primary mt-0.5">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
+                            <?php endif; ?>
                             <div class="flex justify-between items-center mt-2">
                                 <span class="text-xs text-gray-500 dark:text-gray-400 font-medium"><?= $item['quantity'] ?> x ฿<?= number_format($item['p_price']) ?></span>
                                 <span class="text-sm font-extrabold text-primary">฿<?= number_format($item['p_price'] * $item['quantity']) ?></span>
@@ -464,9 +434,9 @@ $netTotal = $subtotal + $shippingCost - $discount;
                     <?php endforeach; ?>
                 </div>
 
-                <div class="mb-6 flex gap-2">
-                    <input class="flex-1 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary px-4 py-3 outline-none transition-all dark:text-white" placeholder="ใส่โค้ดส่วนลด (ถ้ามี)" type="text"/>
-                    <button type="button" class="bg-primary/10 text-primary font-bold text-sm px-5 py-3 rounded-xl hover:bg-primary hover:text-white transition-all">ใช้โค้ด</button>
+                <div class="mb-6 relative">
+                    <input class="w-full text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full focus:border-primary focus:ring-1 focus:ring-primary pl-5 pr-24 py-3.5 outline-none transition-all dark:text-white" placeholder="ใส่โค้ดส่วนลด (ถ้ามี)" type="text" id="discountCodeInput"/>
+                    <button type="button" onclick="applyDiscountCode()" class="absolute right-1.5 top-1.5 bg-primary/10 text-primary font-bold text-sm px-4 py-2 rounded-full hover:bg-primary hover:text-white transition-all">ใช้โค้ด</button>
                 </div>
 
                 <div class="space-y-3 pt-5 border-t border-gray-100 dark:border-gray-700">
@@ -474,12 +444,12 @@ $netTotal = $subtotal + $shippingCost - $discount;
                         <span class="text-gray-500 dark:text-gray-400 font-medium">รวมค่าสินค้า</span>
                         <span class="text-gray-800 dark:text-white font-bold">฿<span id="subtotalDisplay"><?= number_format($subtotal, 2) ?></span></span>
                     </div>
-                    <?php if($discount > 0): ?>
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-500 dark:text-gray-400 font-medium">ส่วนลด</span>
-                        <span class="text-green-500 font-bold">-฿<?= number_format($discount, 2) ?></span>
+                    
+                    <div id="discountRow" class="flex justify-between text-sm <?= $discount > 0 ? '' : 'hidden' ?>">
+                        <span class="text-gray-500 dark:text-gray-400 font-medium">ส่วนลด (Discount)</span>
+                        <span class="text-primary font-bold">-฿<span id="discountDisplay"><?= number_format($discount, 2) ?></span></span>
                     </div>
-                    <?php endif; ?>
+                    
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400 font-medium">ค่าจัดส่ง</span>
                         <span class="text-gray-800 dark:text-white font-bold" id="shippingDisplay">
@@ -495,7 +465,7 @@ $netTotal = $subtotal + $shippingCost - $discount;
 
                 <button type="submit" class="w-full mt-8 bg-primary hover:bg-pink-600 text-white font-bold py-4 rounded-2xl shadow-[0_8px_25px_-8px_rgba(244,63,133,0.6)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-1 relative overflow-hidden group text-lg">
                     ยืนยันคำสั่งซื้อ
-                    <span class="material-icons-round group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                    <span class="material-icons-round ml-2 group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
                 <p class="text-[11px] text-center text-gray-400 mt-4 px-4 leading-relaxed">การกดปุ่มยืนยัน ถือว่าคุณยอมรับ<a href="#" class="text-primary hover:underline font-bold">ข้อกำหนดและเงื่อนไข</a>ของทางร้าน</p>
             </div>
@@ -503,73 +473,19 @@ $netTotal = $subtotal + $shippingCost - $discount;
     </form>
 </main>
 
-<div id="addressModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 modal-content border border-pink-50 dark:border-gray-700">
-        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-            <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <span class="material-icons-round text-primary">location_on</span> เลือกที่อยู่จัดส่ง
-            </h2>
-            <button type="button" onclick="closeAddressModal()" class="w-8 h-8 rounded-full bg-white dark:bg-gray-700 text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-600 flex items-center justify-center transition-colors shadow-sm">
-                <span class="material-icons-round text-[18px]">close</span>
-            </button>
-        </div>
-        
-        <div class="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white dark:bg-gray-800 space-y-4">
-            
-            <?php if(count($addresses) > 0): ?>
-                <?php foreach($addresses as $index => $addr): 
-                    $fullAddr = $addr['address_line'] . ' ' . $addr['district'] . ' ' . $addr['province'] . ' ' . $addr['zipcode'];
-                ?>
-                <label class="relative flex cursor-pointer rounded-2xl border-2 <?= $index == 0 ? 'border-primary bg-pink-50/30' : 'border-gray-100 bg-white' ?> dark:border-gray-700 p-5 focus:outline-none transition-all hover:border-pink-200" onclick="selectAddress('<?= htmlspecialchars($addr['recipient_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($addr['phone'], ENT_QUOTES) ?>', '<?= htmlspecialchars($fullAddr, ENT_QUOTES) ?>', this)">
-                    <input <?= $index == 0 ? 'checked' : '' ?> class="sr-only" name="select_address_radio" type="radio" value="<?= $addr['addr_id'] ?>"/>
-                    <div class="flex flex-1 items-start gap-4">
-                        <div class="flex h-5 items-center mt-1">
-                            <div class="radio-indicator size-5 rounded-full border-[5px] <?= $index == 0 ? 'border-primary' : 'border-gray-300 border-2' ?> bg-white shadow-sm"></div>
-                        </div>
-                        <div class="flex flex-col w-full">
-                            <div class="flex justify-between items-start mb-1">
-                                <span class="block text-base font-bold text-gray-900 dark:text-white"><?= htmlspecialchars($addr['recipient_name']) ?> <span class="text-sm text-gray-500 font-normal ml-2"><?= htmlspecialchars($addr['phone']) ?></span></span>
-                                <?php if($addr['is_default'] == 1): ?>
-                                    <span class="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold">ค่าเริ่มต้น</span>
-                                <?php endif; ?>
-                            </div>
-                            <span class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed"><?= htmlspecialchars($fullAddr) ?></span>
-                        </div>
-                    </div>
-                </label>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <p class="text-center text-gray-500 my-4">คุณยังไม่มีที่อยู่ที่บันทึกไว้ในระบบ</p>
-            <?php endif; ?>
-
-            <a href="../profile/address.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-6 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group mt-4">
-                <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:text-primary group-hover:bg-white rounded-full flex items-center justify-center mx-auto mb-3 transition-colors shadow-sm">
-                    <span class="material-icons-round text-2xl">add_location_alt</span>
-                </div>
-                <span class="font-bold text-gray-600 dark:text-gray-300 group-hover:text-primary">เพิ่มที่อยู่จัดส่งใหม่</span>
-                <p class="text-xs text-gray-400 mt-1">คลิกเพื่อไปยังหน้าจัดการบัญชี</p>
-            </a>
-        </div>
-        
-        <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
-            <button type="button" onclick="closeAddressModal()" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">ปิดหน้าต่าง</button>
-            <button type="button" onclick="confirmAddressSelection()" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-md transition-colors">ยืนยันการเลือก</button>
-        </div>
-    </div>
-</div>
-
 <div id="selectCardModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-xl overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 modal-content border border-pink-50 dark:border-gray-700">
-        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-            <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+    <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 modal-content border border-pink-50 dark:border-gray-700">
+        
+        <div class="px-8 py-5 flex justify-between items-center border-b border-gray-50 dark:border-gray-700">
+            <h2 class="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
                 <span class="material-icons-round text-primary">credit_card</span> เลือกบัตรที่ต้องการใช้
             </h2>
-            <button type="button" onclick="closeSelectCardModal(false)" class="w-8 h-8 rounded-full bg-white dark:bg-gray-700 text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-600 flex items-center justify-center transition-colors shadow-sm">
-                <span class="material-icons-round text-[18px]">close</span>
+            <button type="button" onclick="closeSelectCardModal(false)" class="text-gray-400 hover:text-gray-700 transition-colors">
+                <span class="material-icons-round text-xl">close</span>
             </button>
         </div>
         
-        <div class="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white dark:bg-gray-800 space-y-4">
+        <div class="p-8 pt-4 pb-10 bg-white dark:bg-gray-800 space-y-4">
             
             <?php if($hasSavedCard): ?>
                 <?php foreach($savedCards as $index => $card): ?>
@@ -584,26 +500,32 @@ $netTotal = $subtotal + $shippingCost - $discount;
                         </div>
                         <div class="flex flex-col flex-1">
                             <span class="block text-base font-bold text-gray-900 dark:text-white">ลงท้ายด้วย **** <?= htmlspecialchars($card['card_last4']) ?></span>
-                            <span class="text-sm text-gray-500">หมดอายุ <?= htmlspecialchars($card['expiry_date'] ?? 'ไม่ระบุ') ?></span>
                         </div>
                     </div>
                 </label>
                 <?php endforeach; ?>
-            <?php else: ?>
-                <p class="text-center text-gray-500 my-4">คุณยังไม่มีบัตรเครดิตที่บันทึกไว้</p>
-            <?php endif; ?>
-
-            <button type="button" onclick="closeSelectCardModal(false); openCardFormModal();" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-6 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group mt-4">
-                <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:text-primary group-hover:bg-white rounded-full flex items-center justify-center mx-auto mb-3 transition-colors shadow-sm">
-                    <span class="material-icons-round text-2xl">add</span>
+                
+                <div class="mt-6 flex justify-between gap-4">
+                    <button type="button" onclick="closeSelectCardModal(false)" class="flex-1 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl hover:bg-gray-200 transition">ยกเลิก</button>
+                    <button type="button" onclick="confirmCardSelection()" class="flex-1 py-3.5 bg-primary text-white font-bold rounded-2xl hover:bg-pink-600 transition shadow-lg shadow-primary/30">ยืนยัน</button>
                 </div>
-                <span class="font-bold text-gray-600 dark:text-gray-300 group-hover:text-primary">เพิ่มบัตรเครดิต/เดบิตใหม่</span>
-            </button>
-        </div>
-        
-        <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
-            <button type="button" onclick="closeSelectCardModal(false)" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">ยกเลิก</button>
-            <button type="button" onclick="confirmCardSelection()" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-md transition-colors">ยืนยัน</button>
+
+            <?php else: ?>
+                <div class="text-center mt-2 mb-6">
+                    <p class="text-gray-500 font-medium mb-4">คุณยังไม่มีบัตรเครดิตที่บันทึกไว้</p>
+                    <button type="button" onclick="closeSelectCardModal(false); openCardFormModal();" class="w-full border-[2px] border-dashed border-primary text-primary rounded-2xl py-6 flex flex-col items-center justify-center hover:bg-pink-50 transition-colors">
+                        <div class="w-10 h-10 rounded-full border border-pink-200 flex items-center justify-center mb-2">
+                            <span class="material-icons-round text-xl">add</span>
+                        </div>
+                        <span class="font-bold text-sm">เพิ่มบัตรเครดิต/เดบิตใหม่</span>
+                    </button>
+                </div>
+                
+                <div class="flex justify-between gap-4">
+                    <button type="button" onclick="closeSelectCardModal(false)" class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-2xl hover:bg-gray-200 transition">ยกเลิก</button>
+                    <button type="button" disabled class="flex-1 py-3 bg-primary text-white font-bold rounded-2xl opacity-50 cursor-not-allowed">ยืนยัน</button>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -639,26 +561,70 @@ $netTotal = $subtotal + $shippingCost - $discount;
                     <input type="text" placeholder="MM/YY" maxlength="5" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white text-center font-mono">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">รหัสความปลอดภัย (CVV)</label>
+                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">รหัส (CVV)</label>
                     <input type="password" placeholder="***" maxlength="3" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all dark:text-white text-center font-mono tracking-widest">
                 </div>
-            </div>
-            
-            <div class="flex items-center gap-2 mt-2 ml-1">
-                <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
-                <span class="text-sm text-gray-600 dark:text-gray-400">บันทึกบัตรนี้ไว้ใช้ในครั้งถัดไป</span>
             </div>
         </div>
         
         <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
             <button type="button" onclick="closeCardFormModal()" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 transition-colors">ยกเลิก</button>
-            <button type="button" onclick="saveNewCard()" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-lg shadow-primary/30 transition-transform transform hover:-translate-y-0.5">เพิ่มและใช้บัตรนี้</button>
+            <button type="button" onclick="saveNewCard()" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-lg shadow-primary/30 transition-transform transform hover:-translate-y-0.5">ใช้บัตรนี้</button>
+        </div>
+    </div>
+</div>
+
+<div id="addressModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-300 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-2xl overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 modal-content border border-pink-50 dark:border-gray-700">
+        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <span class="material-icons-round text-primary">location_on</span> เลือกที่อยู่จัดส่ง
+            </h2>
+            <button type="button" onclick="closeAddressModal()" class="w-8 h-8 rounded-full bg-white dark:bg-gray-700 text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-600 flex items-center justify-center transition-colors shadow-sm">
+                <span class="material-icons-round text-[18px]">close</span>
+            </button>
+        </div>
+        
+        <div class="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar bg-white dark:bg-gray-800 space-y-4">
+            <?php if(count($addresses) > 0): ?>
+                <?php foreach($addresses as $index => $addr): 
+                    $fullAddr = $addr['address_line'] . ' ' . $addr['district'] . ' ' . $addr['province'] . ' ' . $addr['zipcode'];
+                ?>
+                <label class="relative flex cursor-pointer rounded-2xl border-2 <?= $index == 0 ? 'border-primary bg-pink-50/30' : 'border-gray-100 bg-white' ?> dark:border-gray-700 p-5 focus:outline-none transition-all hover:border-pink-200" onclick="selectAddress('<?= htmlspecialchars($addr['recipient_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($addr['phone'], ENT_QUOTES) ?>', '<?= htmlspecialchars($fullAddr, ENT_QUOTES) ?>', this)">
+                    <input <?= $index == 0 ? 'checked' : '' ?> class="sr-only" name="select_address_radio" type="radio" value="<?= $addr['addr_id'] ?>"/>
+                    <div class="flex flex-1 items-start gap-4">
+                        <div class="flex h-5 items-center mt-1">
+                            <div class="radio-indicator size-5 rounded-full border-[5px] <?= $index == 0 ? 'border-primary' : 'border-gray-300 border-2' ?> bg-white shadow-sm"></div>
+                        </div>
+                        <div class="flex flex-col w-full">
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="block text-base font-bold text-gray-900 dark:text-white"><?= htmlspecialchars($addr['recipient_name']) ?> <span class="text-sm text-gray-500 font-normal ml-2"><?= htmlspecialchars($addr['phone']) ?></span></span>
+                            </div>
+                            <span class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed"><?= htmlspecialchars($fullAddr) ?></span>
+                        </div>
+                    </div>
+                </label>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p class="text-center text-gray-500 my-4">คุณยังไม่มีที่อยู่ที่บันทึกไว้ในระบบ</p>
+            <?php endif; ?>
+
+            <a href="../profile/address.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-6 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group mt-4">
+                <div class="w-12 h-12 bg-gray-100 dark:bg-gray-700 text-gray-400 group-hover:text-primary group-hover:bg-white rounded-full flex items-center justify-center mx-auto mb-3 transition-colors shadow-sm">
+                    <span class="material-icons-round text-2xl">add_location_alt</span>
+                </div>
+                <span class="font-bold text-gray-600 dark:text-gray-300 group-hover:text-primary">เพิ่มที่อยู่จัดส่งใหม่</span>
+            </a>
+        </div>
+        
+        <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
+            <button type="button" onclick="closeAddressModal()" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">ปิดหน้าต่าง</button>
+            <button type="button" onclick="confirmAddressSelection()" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-md transition-colors">ยืนยัน</button>
         </div>
     </div>
 </div>
 
 <script>
-    // สลับ Dark Mode
     if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
     function toggleTheme() {
         const htmlEl = document.documentElement;
@@ -666,10 +632,8 @@ $netTotal = $subtotal + $shippingCost - $discount;
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
-    // ==========================================
-    // ตัวแปรคำนวณราคา & อัปเดตการจัดส่ง (แก้ไข logic >= 1000)
-    // ==========================================
     const subtotal = <?= $subtotal ?>;
+    let currentDiscount = <?= $discount ?>; // 🟢 ส่วนลดปัจจุบัน 🟢
     const isFreeShippingEligible = (subtotal >= 1000); 
 
     function updateShipping(method) {
@@ -680,10 +644,9 @@ $netTotal = $subtotal + $shippingCost - $discount;
             shippingCost = isFreeShippingEligible ? 50 : 100;
         }
         
-        const discount = <?= $discount ?>;
-        let netTotal = subtotal + shippingCost - discount;
+        let netTotal = subtotal + shippingCost - currentDiscount;
+        if(netTotal < 0) netTotal = 0;
 
-        // อัปเดตตัวเลขใน UI
         const shipDisplay = document.getElementById('shippingDisplay');
         if (shippingCost === 0) {
             shipDisplay.innerHTML = '<span class="text-green-500">ฟรี</span>';
@@ -692,7 +655,6 @@ $netTotal = $subtotal + $shippingCost - $discount;
         }
         document.getElementById('netTotalDisplay').innerText = netTotal.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
         
-        // สลับสี Radio จัดส่ง
         const allLabels = document.querySelectorAll('input[name="shipping_method"]');
         allLabels.forEach(input => {
             const label = input.closest('label');
@@ -704,20 +666,17 @@ $netTotal = $subtotal + $shippingCost - $discount;
                 label.classList.remove('border-gray-100', 'dark:border-gray-600', 'bg-white', 'dark:bg-gray-800');
                 radioCircle.classList.add('border-[5px]', 'border-primary', 'bg-white');
                 radioCircle.classList.remove('border-2', 'border-gray-300', 'dark:border-gray-500');
-                icon.classList.add('text-primary');
-                icon.classList.remove('text-gray-300');
+                icon.classList.add('text-primary'); icon.classList.remove('text-gray-300');
             } else {
                 label.classList.remove('border-primary', 'bg-pink-50/30');
                 label.classList.add('border-gray-100', 'dark:border-gray-600', 'bg-white', 'dark:bg-gray-800');
                 radioCircle.classList.remove('border-[5px]', 'border-primary', 'bg-white');
                 radioCircle.classList.add('border-2', 'border-gray-300', 'dark:border-gray-500');
-                icon.classList.remove('text-primary');
-                icon.classList.add('text-gray-300');
+                icon.classList.remove('text-primary'); icon.classList.add('text-gray-300');
             }
         });
     }
 
-    // 🟢 อัปเดตสไตล์กรอบชำระเงิน + ตรวจสอบบัตรเครดิต 🟢
     function updatePaymentUI() {
         const paymentOptions = document.querySelectorAll('input[name="payment_method"]');
         
@@ -728,206 +687,160 @@ $netTotal = $subtotal + $shippingCost - $discount;
 
             if (input.checked) {
                 label.classList.add('border-primary', 'bg-pink-50/30');
-                label.classList.remove('border-gray-100', 'dark:border-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-700');
-                icon.classList.add('text-primary');
-                icon.classList.remove('text-gray-400');
-                textSpan.classList.add('font-bold', 'text-gray-900', 'dark:text-white');
-                textSpan.classList.remove('font-medium', 'text-gray-700', 'dark:text-gray-300');
+                label.classList.remove('border-gray-100', 'hover:bg-gray-50');
+                icon.classList.add('text-primary'); icon.classList.remove('text-gray-400');
+                textSpan.classList.add('font-bold', 'text-gray-900'); textSpan.classList.remove('font-medium', 'text-gray-700');
 
-                // ตรวจสอบถ้าเลือกบัตรเครดิตแล้วไม่มีข้อมูลบัตร ให้เปิด Modal
                 if (input.value === 'credit_card') {
                     const hasCard = input.getAttribute('data-has-card') === 'true';
                     if (!hasCard) {
-                        openCardFormModal(); // เด้งไปหน้ากรอกบัตรเลยถ้ายังไม่มี
+                        // 🟢 ถ้าไม่มีบัตรให้โชว์หน้าต่างรูปที่ 1 🟢
+                        openSelectCardModal(); 
                     } else {
-                        // ถ้ามีอยู่แล้วก็เปิดหน้าเลือกบัตร
                         openSelectCardModal();
                     }
                 }
             } else {
                 label.classList.remove('border-primary', 'bg-pink-50/30');
-                label.classList.add('border-gray-100', 'dark:border-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-700');
-                icon.classList.remove('text-primary');
-                icon.classList.add('text-gray-400');
-                textSpan.classList.remove('font-bold', 'text-gray-900', 'dark:text-white');
-                textSpan.classList.add('font-medium', 'text-gray-700', 'dark:text-gray-300');
+                label.classList.add('border-gray-100', 'hover:bg-gray-50');
+                icon.classList.remove('text-primary'); icon.classList.add('text-gray-400');
+                textSpan.classList.remove('font-bold', 'text-gray-900'); textSpan.classList.add('font-medium', 'text-gray-700');
             }
         });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        updatePaymentUI();
-    });
+    document.addEventListener('DOMContentLoaded', () => { updatePaymentUI(); });
 
-    // ==========================================
-    // Script สำหรับ Modal ที่อยู่
-    // ==========================================
-    let tempSelectedName = '';
-    let tempSelectedPhone = '';
-    let tempSelectedAddress = '';
+    // 🟢 ตรวจสอบที่อยู่ก่อน Submit (แก้ที่ 3) 🟢
+    function validateCheckout() {
+        const hasAddress = document.getElementById('hasAddressFlag').value === 'true';
+        if (!hasAddress) {
+            Swal.fire({
+                title: 'ไม่พบที่อยู่จัดส่ง',
+                text: 'กรุณาเพิ่มที่อยู่จัดส่งก่อนทำการยืนยันคำสั่งซื้อ',
+                icon: 'warning',
+                confirmButtonColor: '#F43F85',
+                confirmButtonText: 'รับทราบ',
+                customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-full px-8' }
+            });
+            return false; // ห้ามฟอร์มส่งข้อมูล
+        }
+        return true;
+    }
 
+    // 🟢 ฟังก์ชันจำลองใช้โค้ดส่วนลด (แก้ที่ 5) 🟢
+    function applyDiscountCode() {
+        const codeInput = document.getElementById('discountCodeInput').value.trim().toUpperCase();
+        if(codeInput === '') return;
+
+        // จำลอง: ถ้าพิมพ์โค้ด LUMINA50 จะได้ลด 50 บาท
+        if(codeInput === 'LUMINA50') {
+            currentDiscount = 50;
+            document.getElementById('discountDisplay').innerText = currentDiscount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+            document.getElementById('discountRow').classList.remove('hidden');
+            
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'ใช้โค้ดส่วนลดสำเร็จ', showConfirmButton: false, timer: 2000 });
+        } else {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'โค้ดส่วนลดไม่ถูกต้องหรือหมดอายุ', showConfirmButton: false, timer: 2000 });
+        }
+        
+        // อัปเดตยอดรวมใหม่หลังจากคิดส่วนลด
+        const selectedShipping = document.querySelector('input[name="shipping_method"]:checked').value;
+        updateShipping(selectedShipping);
+    }
+
+    // ที่อยู่
+    let tempSelectedName = '', tempSelectedPhone = '', tempSelectedAddress = '';
     const addressModal = document.getElementById('addressModal');
 
     function openAddressModal() {
-        addressModal.classList.remove('hidden');
-        addressModal.classList.add('flex');
-        setTimeout(() => {
-            addressModal.classList.remove('opacity-0');
-            addressModal.querySelector('.modal-content').classList.remove('scale-95');
-        }, 10);
+        addressModal.classList.remove('hidden'); addressModal.classList.add('flex');
+        setTimeout(() => { addressModal.classList.remove('opacity-0'); addressModal.querySelector('.modal-content').classList.remove('scale-95'); }, 10);
     }
-
     function closeAddressModal() {
-        addressModal.classList.add('opacity-0');
-        addressModal.querySelector('.modal-content').classList.add('scale-95');
-        setTimeout(() => {
-            addressModal.classList.add('hidden');
-            addressModal.classList.remove('flex');
-        }, 300);
+        addressModal.classList.add('opacity-0'); addressModal.querySelector('.modal-content').classList.add('scale-95');
+        setTimeout(() => { addressModal.classList.add('hidden'); addressModal.classList.remove('flex'); }, 300);
     }
-
     function selectAddress(name, phone, address, labelElement) {
-        tempSelectedName = name;
-        tempSelectedPhone = phone;
-        tempSelectedAddress = address;
-
-        // สลับสไตล์กรอบใน Modal
+        tempSelectedName = name; tempSelectedPhone = phone; tempSelectedAddress = address;
         const allLabels = addressModal.querySelectorAll('label');
         allLabels.forEach(lbl => {
             const ind = lbl.querySelector('.radio-indicator');
-            lbl.classList.remove('border-primary', 'bg-pink-50/30');
-            lbl.classList.add('border-gray-100', 'bg-white');
-            ind.classList.remove('border-primary', 'border-[5px]');
-            ind.classList.add('border-gray-300', 'border-2');
+            lbl.classList.remove('border-primary', 'bg-pink-50/30'); lbl.classList.add('border-gray-100', 'bg-white');
+            ind.classList.remove('border-primary', 'border-[5px]'); ind.classList.add('border-gray-300', 'border-2');
         });
-
-        labelElement.classList.add('border-primary', 'bg-pink-50/30');
-        labelElement.classList.remove('border-gray-100', 'bg-white');
+        labelElement.classList.add('border-primary', 'bg-pink-50/30'); labelElement.classList.remove('border-gray-100', 'bg-white');
         const indicator = labelElement.querySelector('.radio-indicator');
-        indicator.classList.add('border-primary', 'border-[5px]');
-        indicator.classList.remove('border-gray-300', 'border-2');
+        indicator.classList.add('border-primary', 'border-[5px]'); indicator.classList.remove('border-gray-300', 'border-2');
     }
-
     function confirmAddressSelection() {
         if (tempSelectedName !== '') {
             document.getElementById('displayFullName').innerText = tempSelectedName;
             document.getElementById('displayPhone').innerText = tempSelectedPhone;
             document.getElementById('displayAddress').innerText = tempSelectedAddress;
+            document.getElementById('displayAddress').classList.remove('text-red-500', 'font-medium');
             document.getElementById('inputShippingAddress').value = tempSelectedAddress;
+            document.getElementById('hasAddressFlag').value = 'true';
         }
         closeAddressModal();
     }
 
-    // ==========================================
-    // Script สำหรับ Modal บัตรเครดิต
-    // ==========================================
+    // บัตรเครดิต
     const selectCardModal = document.getElementById('selectCardModal');
     const cardFormModal = document.getElementById('cardFormModal');
-    let tempCardLast4 = '';
-    let tempCardType = '';
+    let tempCardLast4 = '', tempCardType = '';
 
     function openSelectCardModal() {
-        selectCardModal.classList.remove('hidden');
-        selectCardModal.classList.add('flex');
-        setTimeout(() => {
-            selectCardModal.classList.remove('opacity-0');
-            selectCardModal.querySelector('.modal-content').classList.remove('scale-95');
-        }, 10);
+        selectCardModal.classList.remove('hidden'); selectCardModal.classList.add('flex');
+        setTimeout(() => { selectCardModal.classList.remove('opacity-0'); selectCardModal.querySelector('.modal-content').classList.remove('scale-95'); }, 10);
     }
-
     function closeSelectCardModal(isConfirmed) {
-        selectCardModal.classList.add('opacity-0');
-        selectCardModal.querySelector('.modal-content').classList.add('scale-95');
-        setTimeout(() => {
-            selectCardModal.classList.add('hidden');
-            selectCardModal.classList.remove('flex');
-        }, 300);
-
-        if (!isConfirmed) {
-            // ถ้ายกเลิก กลับไปพร้อมเพย์
-            document.querySelector('input[value="promptpay"]').checked = true;
-            updatePaymentUI();
-        }
+        selectCardModal.classList.add('opacity-0'); selectCardModal.querySelector('.modal-content').classList.add('scale-95');
+        setTimeout(() => { selectCardModal.classList.add('hidden'); selectCardModal.classList.remove('flex'); }, 300);
+        if (!isConfirmed) { document.querySelector('input[value="promptpay"]').checked = true; updatePaymentUI(); }
     }
-
     function selectCardUI(last4, type, labelElement) {
-        tempCardLast4 = last4;
-        tempCardType = type;
-
+        tempCardLast4 = last4; tempCardType = type;
         const allLabels = selectCardModal.querySelectorAll('label');
         allLabels.forEach(lbl => {
             const ind = lbl.querySelector('.radio-indicator');
-            lbl.classList.remove('border-primary', 'bg-pink-50/30');
-            lbl.classList.add('border-gray-100', 'bg-white');
-            ind.classList.remove('border-primary', 'border-[5px]');
-            ind.classList.add('border-gray-300', 'border-2');
+            lbl.classList.remove('border-primary', 'bg-pink-50/30'); lbl.classList.add('border-gray-100', 'bg-white');
+            ind.classList.remove('border-primary', 'border-[5px]'); ind.classList.add('border-gray-300', 'border-2');
         });
-
-        labelElement.classList.add('border-primary', 'bg-pink-50/30');
-        labelElement.classList.remove('border-gray-100', 'bg-white');
+        labelElement.classList.add('border-primary', 'bg-pink-50/30'); labelElement.classList.remove('border-gray-100', 'bg-white');
         const indicator = labelElement.querySelector('.radio-indicator');
-        indicator.classList.add('border-primary', 'border-[5px]');
-        indicator.classList.remove('border-gray-300', 'border-2');
+        indicator.classList.add('border-primary', 'border-[5px]'); indicator.classList.remove('border-gray-300', 'border-2');
     }
-
     function confirmCardSelection() {
-        // อัปเดต UI หลัก
         const cardInput = document.querySelector('input[value="credit_card"]');
         cardInput.setAttribute('data-has-card', 'true');
         document.getElementById('savedCardInfo').classList.remove('hidden');
         document.getElementById('displayCardLast4').innerText = tempCardLast4 || 'XXXX';
         document.getElementById('displayCardType').innerText = tempCardType || 'VISA';
-        
         closeSelectCardModal(true);
     }
-
-    // Modal เพิ่มบัตรใหม่
     function openCardFormModal() {
-        cardFormModal.classList.remove('hidden');
-        cardFormModal.classList.add('flex');
-        setTimeout(() => {
-            cardFormModal.classList.remove('opacity-0');
-            cardFormModal.querySelector('.modal-content').classList.remove('scale-95');
-        }, 10);
+        cardFormModal.classList.remove('hidden'); cardFormModal.classList.add('flex');
+        setTimeout(() => { cardFormModal.classList.remove('opacity-0'); cardFormModal.querySelector('.modal-content').classList.remove('scale-95'); }, 10);
     }
-
     function closeCardFormModal() {
-        cardFormModal.classList.add('opacity-0');
-        cardFormModal.querySelector('.modal-content').classList.add('scale-95');
-        setTimeout(() => {
-            cardFormModal.classList.add('hidden');
-            cardFormModal.classList.remove('flex');
-        }, 300);
-        
-        // ถ้ายกเลิก กลับไปพร้อมเพย์
-        document.querySelector('input[value="promptpay"]').checked = true;
-        updatePaymentUI();
+        cardFormModal.classList.add('opacity-0'); cardFormModal.querySelector('.modal-content').classList.add('scale-95');
+        setTimeout(() => { cardFormModal.classList.add('hidden'); cardFormModal.classList.remove('flex'); }, 300);
+        document.querySelector('input[value="promptpay"]').checked = true; updatePaymentUI();
     }
-
     function saveNewCard() {
-        // จำลองการดึงค่าจากช่องกรอก
         const rawCardNum = document.getElementById('newCardNumber').value;
         const last4 = rawCardNum.length >= 4 ? rawCardNum.slice(-4) : '1234';
-        
-        // จำลองว่าเซฟผ่าน อัปเดต UI หลัก
         const cardInput = document.querySelector('input[value="credit_card"]');
         cardInput.setAttribute('data-has-card', 'true');
         document.getElementById('savedCardInfo').classList.remove('hidden');
         document.getElementById('displayCardLast4').innerText = last4;
         document.getElementById('displayCardType').innerText = 'VISA';
 
-        Swal.fire({
-            toast: true, position: 'top-end', icon: 'success',
-            title: 'บันทึกบัตรใหม่สำเร็จ', showConfirmButton: false, timer: 2000
-        });
-
-        // ปิดแบบ Confirm (ไม่สลับกลับไป promptpay)
-        cardFormModal.classList.add('opacity-0');
-        cardFormModal.querySelector('.modal-content').classList.add('scale-95');
-        setTimeout(() => {
-            cardFormModal.classList.add('hidden');
-            cardFormModal.classList.remove('flex');
-        }, 300);
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'บันทึกบัตรใหม่สำเร็จ', showConfirmButton: false, timer: 2000 });
+        
+        cardFormModal.classList.add('opacity-0'); cardFormModal.querySelector('.modal-content').classList.add('scale-95');
+        setTimeout(() => { cardFormModal.classList.add('hidden'); cardFormModal.classList.remove('flex'); }, 300);
     }
 </script>
 

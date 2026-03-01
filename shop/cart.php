@@ -222,13 +222,6 @@ $netTotal = $totalPrice + $shippingFee; // ยอดสุทธิ
                 </a>
             </div>
 
-            <div class="flex items-center space-x-2 sm:space-x-4">
-                <div class="hidden md:flex items-center relative mr-2">
-                    <form action="products.php" method="GET">
-                        <input type="text" name="search" placeholder="ค้นหาสินค้า..." class="pl-10 pr-4 py-2 bg-pink-50 dark:bg-gray-800 border-none rounded-full text-sm focus:ring-2 focus:ring-primary w-48 lg:w-64 transition-all placeholder-gray-400 dark:text-white outline-none">
-                        <button type="submit" class="material-icons-round absolute left-3 top-2 text-gray-400 text-lg">search</button>
-                    </form>
-                </div>
                 <a href="favorites.php" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center group">
                     <span class="material-icons-round text-2xl transition-transform duration-300 group-hover:scale-110">favorite_border</span>
                 </a>
@@ -358,7 +351,7 @@ $netTotal = $totalPrice + $shippingFee; // ยอดสุทธิ
                                     </a>
                                     
                                     <?php if(!empty($item['selected_color'])): ?>
-                                        <p class="text-xs font-bold text-primary bg-pink-100 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md mt-1 shadow-sm border border-pink-200 dark:border-gray-600">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
+                                        <p class="text-xs font-bold text-primary bg-pink-100 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md mt-1 shadow-sm border border-pink-200 dark:border-gray-600">ตัวเลือก: <?= htmlspecialchars($item['selected_color']) ?></p>
                                     <?php endif; ?>
                                     
                                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">ราคา: ฿<?= number_format($item['p_price']) ?> / ชิ้น</p>
@@ -419,10 +412,6 @@ $netTotal = $totalPrice + $shippingFee; // ยอดสุทธิ
                             <div class="flex justify-between text-gray-600 dark:text-gray-300">
                                 <span>ราคารวม (Subtotal)</span>
                                 <span class="font-medium">฿<?= number_format($totalPrice) ?></span>
-                            </div>
-                            <div class="flex justify-between text-gray-600 dark:text-gray-300">
-                                <span>ส่วนลด (Discount)</span>
-                                <span class="text-primary font-medium">-฿0</span>
                             </div>
                             <div class="flex justify-between text-gray-600 dark:text-gray-300">
                                 <span>ค่าจัดส่ง (Shipping)</span>
