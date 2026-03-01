@@ -7,7 +7,7 @@ require_once '../config/connectdbuser.php';
 // ==========================================
 // if (!isset($_SESSION['admin_id'])) { header("Location: ../auth/login.php"); exit(); }
 $adminName = $_SESSION['admin_username'] ?? 'Admin Nina'; 
-$adminAvatar = "https://ui-avatars.com/api/?name=Admin&background=a855f7&color=fff";
+$adminAvatar = "admin.jpg";
 
 // ==========================================
 // 2. จัดการแก้ไขสถานะ (POST)

@@ -17,7 +17,7 @@ if (isset($_SESSION['admin_id'])) {
     $isAdmin = true;
     $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
     $userData['u_email'] = 'Administrator Mode';
-    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    $profileImage = "/../admin/admin.jpg/" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
     
 } elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
@@ -268,7 +268,7 @@ if ($isLoggedIn) {
                 </button>
                 
                 <div class="relative group flex items-center">
-                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : ($isLoggedIn ? '../profile/account.php' : '../auth/login.php') ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
                             <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=ec2d88&color=fff'"/>
                         </div>

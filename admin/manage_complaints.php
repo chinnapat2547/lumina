@@ -3,7 +3,7 @@ session_start();
 require_once '../config/connectdbuser.php';
 
 $adminName = $_SESSION['admin_username'] ?? 'Admin Nina'; 
-$adminAvatar = "https://ui-avatars.com/api/?name=" . urlencode($adminName) . "&background=a855f7&color=fff";
+$adminAvatar = "admin.jpg";
 
 // ==========================================
 // ส่วนดึงข้อมูลแจ้งเตือนสำหรับ Sidebar (ต้องมีทุกหน้า)

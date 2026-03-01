@@ -18,7 +18,7 @@ if (isset($_SESSION['admin_id'])) {
     $isAdmin = true;
     $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
     $userData['u_email'] = 'Administrator Mode';
-    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    $profileImage = "/../admin/admin.jpg/" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
 } elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
     $u_id = $_SESSION['u_id'];
@@ -238,7 +238,7 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories_list[] = $c; }
                 </div>
             </div>
 
-            <a class="group flex flex-col items-center justify-center transition" href="../contact.php">
+            <a class="group flex flex-col items-center justify-center transition" href="../auth/contact.php">
                 <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">ติดต่อเรา</span>
                 <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary">(Contact)</span>
             </a>
@@ -272,7 +272,7 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories_list[] = $c; }
             </button>
 
             <div class="relative group flex items-center">
-                <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                <a href="<?= $isAdmin ? '../admin/dashboard.php' : ($isLoggedIn ? '../profile/account.php' : '../auth/login.php') ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                     <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
                         <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
                     </div>

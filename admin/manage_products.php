@@ -410,7 +410,7 @@ while($p = mysqli_fetch_assoc($resProd)) {
                 <div class="relative group flex items-center">
                     <?php 
                         $adminName = $_SESSION['admin_username'] ?? 'Admin'; 
-                        $adminAvatar = "https://ui-avatars.com/api/?name=" . urlencode($adminName) . "&background=a855f7&color=fff";
+                        $adminAvatar = "admin.jpg";
                     ?>
                     <a href="#" class="block w-11 h-11 rounded-full bg-gradient-to-tr from-purple-400 to-indigo-400 p-[2px] shadow-sm hover:shadow-glow hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full overflow-hidden">

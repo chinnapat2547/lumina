@@ -26,7 +26,7 @@ if ($stmtA = mysqli_prepare($conn, $sqlAdmin)) {
         $_SESSION['admin_username'] = $adminName; // อัปเดต Session ด้วย
     }
 }
-$adminAvatar = "https://ui-avatars.com/api/?name=" . urlencode($adminName) . "&background=a855f7&color=fff";
+$adminAvatar = "admin.jpg";
 
 // ==========================================
 // 2. จัดการบันทึกข้อมูล (POST & GET)
