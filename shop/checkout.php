@@ -7,46 +7,53 @@ require_once '../config/connectdbuser.php';
 // ==========================================
 $isLoggedIn = false;
 $isAdmin = false;
-$userData = ['u_username' => 'ผู้ใช้งาน', 'u_email' => ''];
-$profileImage = "https://ui-avatars.com/api/?name=User&background=F43F85&color=fff";
-$totalCartItems = 0; // ประกาศรอไว้สำหรับโชว์ใน Navbar
+$profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
+$userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
+$totalCartItems = 0;
 
-// ตรวจสอบว่าเป็น Admin หรือ User ธรรมดา
+// 🟢 แก้ไข: ตรวจสอบ Session ของ Admin ก่อน 🟢
 if (isset($_SESSION['admin_id'])) {
     $isLoggedIn = true;
     $isAdmin = true;
-    $u_id = $_SESSION['admin_id']; // กัน Error ใน Query ด้านล่าง
     $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
     $userData['u_email'] = 'Administrator Mode';
     $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    
 } elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
     $u_id = $_SESSION['u_id'];
     
-    $sqlUser = "SELECT a.u_username, a.u_email, a.u_name, u.u_image, u.u_phone, u.u_address 
-                FROM `account` a 
-                LEFT JOIN `user` u ON a.u_id = u.u_id 
-                WHERE a.u_id = ?";
+    // ดึงข้อมูลผู้ใช้
+    $sqlUser = "SELECT a.u_username, a.u_email, u.u_image FROM `account` a LEFT JOIN `user` u ON a.u_id = u.u_id WHERE a.u_id = ?";
     if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
         mysqli_stmt_bind_param($stmtUser, "i", $u_id);
         mysqli_stmt_execute($stmtUser);
         $resultUser = mysqli_stmt_get_result($stmtUser);
+        
         if ($rowUser = mysqli_fetch_assoc($resultUser)) {
             $userData = $rowUser;
-            // ดึงรูปโปรไฟล์ให้ถูกต้อง
+            
             $physical_path = __DIR__ . "/../profile/uploads/" . $userData['u_image'];
             if (!empty($userData['u_image']) && file_exists($physical_path)) {
                 $profileImage = "../profile/uploads/" . $userData['u_image'];
             } else {
-                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($rowUser['u_username']) . "&background=F43F85&color=fff";
+                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=F43F85&color=fff";
             }
         }
         mysqli_stmt_close($stmtUser);
     }
-} else {
-    // ไม่มี Session ใดๆ ให้เด้งกลับไป Login
-    header("Location: ../auth/login.php");
-    exit();
+    
+    // นับจำนวนสินค้าในตะกร้า
+    $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
+    if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
+        mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
+        mysqli_stmt_execute($stmtCartCount);
+        $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
+        if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
+            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
+        }
+        mysqli_stmt_close($stmtCartCount);
+    }
 }
 
 // ==========================================
@@ -241,12 +248,12 @@ if ($netTotal < 0) $netTotal = 0;
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-4">
-                <a href="favorites.php" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center">
-                    <span class="material-icons-round text-2xl">favorite_border</span>
+                <a href="favorites.php" id="nav-fav-icon" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center group">
+                    <span class="material-icons-round text-2xl transition-transform duration-300 group-hover:scale-110">favorite_border</span>
                 </a>
-                <a href="cart.php" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
-                    <span class="material-icons-round text-2xl">shopping_bag</span>
-                    <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800"><?= $totalCartItems ?></span>
+                <a href="cart.php" id="nav-cart-icon" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
+                    <span class="material-icons-round text-2xl transition-transform duration-300">shopping_bag</span>
+                    <span id="cart-badge" class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800 transition-transform duration-300"><?= $totalCartItems ?></span>
                 </a>
                 <button class="w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all" onclick="toggleTheme()">
                     <span class="material-icons-round dark:hidden text-2xl">dark_mode</span>
@@ -260,6 +267,7 @@ if ($netTotal < 0) $netTotal = 0;
                         </div>
                     </a>
                     
+                    <?php if($isLoggedIn): ?>
                     <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
                         <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
                             <div class="text-center mb-4">
@@ -293,6 +301,7 @@ if ($netTotal < 0) $netTotal = 0;
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -533,7 +542,7 @@ if ($netTotal < 0) $netTotal = 0;
             </button>
         </div>
         
-        <div class="p-8 pt-4 pb-10 bg-white dark:bg-gray-800 space-y-4">
+        <div class="p-8 pt-4 pb-10 bg-white dark:bg-gray-800 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
             
             <?php if($hasSavedCard): ?>
                 <?php foreach($savedCards as $index => $card): ?>
@@ -553,6 +562,12 @@ if ($netTotal < 0) $netTotal = 0;
                 </label>
                 <?php endforeach; ?>
                 
+                <a href="payment.php" class="block w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-4 text-center hover:border-primary hover:bg-pink-50/50 dark:hover:bg-gray-700 transition-colors group mt-2">
+                    <span class="font-bold text-sm text-gray-600 dark:text-gray-300 group-hover:text-primary flex items-center justify-center gap-2">
+                        <span class="material-icons-round text-lg">add_circle_outline</span> เพิ่มบัตรเครดิต/เดบิตใบใหม่
+                    </span>
+                </a>
+
                 <div class="mt-6 flex justify-between gap-4">
                     <button type="button" onclick="closeSelectCardModal(false)" class="flex-1 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl hover:bg-gray-200 transition">ยกเลิก</button>
                     <button type="button" onclick="confirmCardSelection()" class="flex-1 py-3.5 bg-primary text-white font-bold rounded-2xl hover:bg-pink-600 transition shadow-lg shadow-primary/30">ยืนยัน</button>
@@ -561,12 +576,12 @@ if ($netTotal < 0) $netTotal = 0;
             <?php else: ?>
                 <div class="text-center mt-2 mb-6">
                     <p class="text-gray-500 font-medium mb-4">คุณยังไม่มีบัตรเครดิตที่บันทึกไว้</p>
-                    <button type="button" onclick="closeSelectCardModal(false); openCardFormModal();" class="w-full border-[2px] border-dashed border-primary text-primary rounded-2xl py-6 flex flex-col items-center justify-center hover:bg-pink-50 transition-colors">
-                        <div class="w-10 h-10 rounded-full border border-pink-200 flex items-center justify-center mb-2">
+                    <a href="payment.php" class="w-full border-[2px] border-dashed border-primary text-primary rounded-2xl py-6 flex flex-col items-center justify-center hover:bg-pink-50 transition-colors cursor-pointer">
+                        <div class="w-10 h-10 rounded-full border border-pink-200 flex items-center justify-center mb-2 bg-white">
                             <span class="material-icons-round text-xl">add</span>
                         </div>
                         <span class="font-bold text-sm">เพิ่มบัตรเครดิต/เดบิตใหม่</span>
-                    </button>
+                    </a>
                 </div>
                 
                 <div class="flex justify-between gap-4">
@@ -575,48 +590,6 @@ if ($netTotal < 0) $netTotal = 0;
                 </div>
             <?php endif; ?>
         </div>
-    </div>
-</div>
-
-<div id="cardFormModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] hidden items-center justify-center opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 modal-content border border-pink-50 dark:border-gray-700">
-        <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-            <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <span class="material-icons-round text-primary">credit_card</span> เพิ่มบัตรเครดิต/เดบิต
-            </h2>
-            <button type="button" onclick="closeCardFormModal()" class="w-8 h-8 rounded-full bg-white dark:bg-gray-700 text-gray-400 hover:text-red-500 border border-gray-200 dark:border-gray-600 flex items-center justify-center transition-colors shadow-sm">
-                <span class="material-icons-round text-[18px]">close</span>
-            </button>
-        </div>
-        
-        <form action="payment.php" method="POST">
-            <div class="p-6 bg-white dark:bg-gray-800 space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">หมายเลขบัตร (Card Number)</label>
-                    <input type="text" name="cardNumber" id="cardNumber" placeholder="0000 0000 0000 0000" maxlength="19" required class="w-full form-input font-mono">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">ชื่อบนบัตร (Cardholder Name)</label>
-                    <input type="text" name="cardName" placeholder="NAME LASTNAME" required class="w-full form-input uppercase">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">วันหมดอายุ</label>
-                        <input type="text" name="cardExpiry" id="cardExpiry" placeholder="MM/YY" maxlength="5" required class="w-full form-input font-mono text-center">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 ml-1">รหัส CVV</label>
-                        <input type="password" name="cardCvv" placeholder="•••" maxlength="3" required class="w-full form-input font-mono tracking-widest text-center">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 flex justify-end gap-3 rounded-b-[2rem]">
-                <button type="button" onclick="closeCardFormModal()" class="px-6 py-2.5 rounded-full font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 transition-colors">ยกเลิก</button>
-                <button type="submit" class="px-8 py-2.5 rounded-full font-bold text-white bg-primary hover:bg-pink-600 shadow-lg shadow-primary/30 transition-transform transform hover:-translate-y-0.5">เพิ่มบัตรนี้</button>
-            </div>
-        </form>
-
     </div>
 </div>
 
