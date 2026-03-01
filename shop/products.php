@@ -249,9 +249,12 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories_list[] = $c; }
 
         <div class="flex items-center space-x-3 sm:space-x-5">
             <div class="hidden xl:block relative group">
-                <form action="products.php" method="GET">
-                    <input id="liveSearchInput" name="search" value="<?= htmlspecialchars($search_query) ?>" class="pl-10 pr-4 py-2 rounded-full border border-pink-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary text-sm w-48 xl:w-56 transition-all relative z-10" placeholder="ค้นหาสินค้า..." type="text" autocomplete="off"/>
-                    <button type="submit" class="material-icons-round absolute left-3 top-2 text-gray-400 z-10">search</button>
+                <form action="products.php" method="GET" class="relative">
+                    <input id="liveSearchInput" name="search" value="<?= htmlspecialchars($search_query) ?>" onkeyup="liveSearch(this.value)" class="pl-10 pr-4 py-2 rounded-full border border-pink-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary text-sm w-48 xl:w-56 transition-all relative z-10" placeholder="ค้นหาสินค้า..." type="text" autocomplete="off"/>
+                    <span class="material-icons-round absolute left-3 top-2 text-gray-400 z-10 pointer-events-none">search</span>
+        
+                    <div id="searchResultBox" class="absolute top-[110%] left-0 w-[150%] bg-white dark:bg-gray-800 shadow-2xl rounded-2xl overflow-hidden hidden z-[100] border border-gray-100 dark:border-gray-700 max-h-[400px] overflow-y-auto">
+                    </div>
                 </form>
             </div>
             
@@ -760,6 +763,37 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories_list[] = $c; }
         if(catString) url += `&${catString}`;
         window.location.href = url;
     }
+
+    function liveSearch(query) {
+        const resultBox = document.getElementById('searchResultBox');
+        
+        // ถ้าผู้ใช้ลบข้อความจนหมด ให้ซ่อนกล่องผลลัพธ์
+        if (query.trim().length === 0) {
+            resultBox.innerHTML = '';
+            resultBox.classList.add('hidden');
+            return;
+        }
+
+        // ยิงข้อมูลคำค้นหาไปที่ไฟล์ ajax_search.php ของคุณ
+        fetch('ajax_search.php?q=' + encodeURIComponent(query))
+            .then(response => response.text())
+            .then(html => {
+                resultBox.innerHTML = html;
+                resultBox.classList.remove('hidden'); // แสดงกล่องผลลัพธ์ทันทีที่พิมพ์
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // ฟังก์ชันเสริม: หากกดคลิกที่อื่นบนหน้าเว็บ ให้ซ่อนกล่องผลลัพธ์ค้นหาอัตโนมัติ
+    document.addEventListener('click', function(e) {
+        const searchInput = document.getElementById('liveSearchInput');
+        const resultBox = document.getElementById('searchResultBox');
+        
+        // เช็คว่ามีกล่องอยู่ไหม และเช็คว่าจุดที่คลิก ไม่ใช่ช่อง input หรือกล่อง Dropdown
+        if (searchInput && resultBox && !searchInput.contains(e.target) && !resultBox.contains(e.target)) {
+            resultBox.classList.add('hidden');
+        }
+    });
 </script>
 
 </body>
