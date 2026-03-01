@@ -250,18 +250,22 @@ function getPaymentMethodIcon($method) {
 
 <main class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
     
-    <div class="flex flex-col mb-6 gap-2">
+    <div class="flex justify-between items-start mb-6">
         <div>
-            <div class="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
+            <div class="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <a href="account.php" class="hover:text-primary transition">บัญชีของฉัน</a>
                 <span class="material-icons-round text-[14px]">chevron_right</span>
                 <a href="orders.php" class="hover:text-primary transition">ประวัติการสั่งซื้อ</a>
                 <span class="material-icons-round text-[14px]">chevron_right</span>
                 <span class="text-primary font-bold">รายละเอียด</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">คำสั่งซื้อ #<?= htmlspecialchars($order['order_no']) ?></h1>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">คำสั่งซื้อ #<?= htmlspecialchars($order['order_no']) ?></h1>
             <p class="text-gray-500 dark:text-gray-400 text-sm">สั่งซื้อเมื่อ <?= $formatted_date ?></p>
         </div>
+        
+        <a href="orders.php" class="hidden sm:flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm">
+            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
+        </a>
     </div>
 
     <div class="<?= $badge['color'] ?> border rounded-[2rem] p-6 mb-8 flex items-center gap-4 shadow-sm">
@@ -281,10 +285,6 @@ function getPaymentMethodIcon($method) {
             </p>
         </div>
     </div>
-    <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
-        <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
-    </a>
-</div>  
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
