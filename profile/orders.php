@@ -45,6 +45,19 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
     mysqli_stmt_close($stmtCartCount);
 }
 
+// 🟢 แก้ที่ 4: ดึงจำนวนออเดอร์ในแต่ละสถานะเพื่อทำแจ้งเตือน 🟢
+$statusCounts = ['pending' => 0, 'processing' => 0, 'shipped' => 0, 'completed' => 0];
+$sqlCounts = "SELECT status, COUNT(order_id) as count FROM `orders` WHERE u_id = ? GROUP BY status";
+if ($stmtCounts = mysqli_prepare($conn, $sqlCounts)) {
+    mysqli_stmt_bind_param($stmtCounts, "i", $u_id);
+    mysqli_stmt_execute($stmtCounts);
+    $resCounts = mysqli_stmt_get_result($stmtCounts);
+    while ($row = mysqli_fetch_assoc($resCounts)) {
+        $statusCounts[$row['status']] = $row['count'];
+    }
+    mysqli_stmt_close($stmtCounts);
+}
+
 // ==========================================
 // 2. จัดการตัวกรองสถานะ และดึงข้อมูลคำสั่งซื้อ
 // ==========================================
@@ -64,7 +77,6 @@ if ($stmtOrders = mysqli_prepare($conn, $sqlOrders)) {
     $resultOrders = mysqli_stmt_get_result($stmtOrders);
     
     while ($order = mysqli_fetch_assoc($resultOrders)) {
-        // ดึงรายการสินค้าของแต่ละออเดอร์มาใส่ไว้ใน Array ของออเดอร์นั้นๆ
         $order_id = $order['order_id'];
         $items = [];
         $sqlItems = "SELECT * FROM `order_items` WHERE order_id = ?";
@@ -198,7 +210,7 @@ function getStatusBadge($status) {
                     <a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="payment.php">
                         <span class="material-icons-round">credit_card</span><span>วิธีการชำระเงิน</span>
                     </a>
-                    <a class="flex items-center space-x-3 px-4 py-3 bg-pink-50 dark:bg-pink-900/20 text-primary font-medium rounded-2xl transition-all shadow-sm" href="history.php">
+                    <a class="flex items-center space-x-3 px-4 py-3 bg-pink-50 dark:bg-pink-900/20 text-primary font-medium rounded-2xl transition-all shadow-sm" href="orders.php">
                         <span class="material-icons-round">history</span><span>ประวัติการสั่งซื้อ</span>
                     </a>
                     <a class="flex items-center space-x-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all" href="address.php">
@@ -229,11 +241,30 @@ function getStatusBadge($status) {
                 <div class="absolute -top-10 -right-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
             </div>
 
-            <div class="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide">
+            <div class="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide pt-2">
                 <a href="?status=all" class="px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'all' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">ทั้งหมด</a>
-                <a href="?status=pending" class="px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'pending' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">ที่ต้องชำระ</a>
-                <a href="?status=processing" class="px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'processing' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">ที่ต้องจัดส่ง</a>
-                <a href="?status=shipped" class="px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'shipped' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">ที่ต้องได้รับ</a>
+                
+                <a href="?status=pending" class="relative px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'pending' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">
+                    ที่ต้องชำระ
+                    <?php if($statusCounts['pending'] > 0): ?>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-sm"><?= $statusCounts['pending'] ?></span>
+                    <?php endif; ?>
+                </a>
+                
+                <a href="?status=processing" class="relative px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'processing' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">
+                    ที่ต้องจัดส่ง
+                    <?php if($statusCounts['processing'] > 0): ?>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-sm"><?= $statusCounts['processing'] ?></span>
+                    <?php endif; ?>
+                </a>
+                
+                <a href="?status=shipped" class="relative px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'shipped' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">
+                    ที่ต้องได้รับ
+                    <?php if($statusCounts['shipped'] > 0): ?>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-sm"><?= $statusCounts['shipped'] ?></span>
+                    <?php endif; ?>
+                </a>
+                
                 <a href="?status=completed" class="px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all <?= $current_status === 'completed' ? 'bg-primary text-white shadow-md' : 'bg-card-light dark:bg-card-dark text-gray-500 hover:text-primary border border-gray-100 dark:border-gray-700' ?>">สำเร็จแล้ว</a>
             </div>
 
@@ -253,6 +284,11 @@ function getStatusBadge($status) {
                     <?php foreach ($orders as $order): 
                         $badge = getStatusBadge($order['status']);
                         $formattedDate = date('d M Y, H:i', strtotime($order['created_at']));
+                        
+                        // 🟢 แก้ที่ 3: คำนวณวันคาดว่าจะได้รับสินค้า (ส่งด่วน +1 วัน, ธรรมดา +3 วัน)
+                        $shipping_method = $order['shipping_method'] ?? 'standard';
+                        $days_to_add = ($shipping_method === 'express') ? 1 : 3;
+                        $expectedDate = date('d M Y', strtotime($order['created_at'] . " + {$days_to_add} days"));
                     ?>
                         <div class="bg-card-light dark:bg-card-dark rounded-3xl p-6 shadow-soft border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow">
                             <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-4 mb-4">
@@ -267,16 +303,24 @@ function getStatusBadge($status) {
                             
                             <div class="space-y-4 mb-6">
                                 <?php foreach ($order['items'] as $item): 
-                                    $imgUrl = (!empty($item['p_image']) && file_exists("../uploads/products/" . $item['p_image'])) 
+                                    // 🟢 แก้ที่ 1: เอารูปมาแสดงให้ถูกต้อง (ลบ file_exists ป้องกันปัญหา Path ผิด)
+                                    $imgUrl = (!empty($item['p_image'])) 
                                                 ? "../uploads/products/" . $item['p_image'] 
                                                 : "https://via.placeholder.com/150";
                                 ?>
                                     <div class="flex gap-4 items-center">
-                                        <div class="w-20 h-20 rounded-2xl bg-gray-50 dark:bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-100 dark:border-gray-700">
-                                            <img src="<?= $imgUrl ?>" class="w-full h-full object-cover">
+                                        <div class="w-20 h-20 rounded-2xl bg-gray-50 dark:bg-gray-800 overflow-hidden flex-shrink-0 border border-gray-100 dark:border-gray-700 relative">
+                                            <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover">
                                         </div>
                                         <div class="flex-1">
                                             <h4 class="font-bold text-gray-800 dark:text-white text-sm md:text-base line-clamp-1"><?= htmlspecialchars($item['p_name']) ?></h4>
+                                            
+                                            <?php if (!empty($item['selected_color'])): ?>
+                                                <p class="text-[11px] font-bold text-primary bg-pink-50 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md mt-1 border border-pink-100 dark:border-gray-600">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
+                                            <?php elseif (!empty($item['color'])): ?>
+                                                <p class="text-[11px] font-bold text-primary bg-pink-50 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md mt-1 border border-pink-100 dark:border-gray-600">สี: <?= htmlspecialchars($item['color']) ?></p>
+                                            <?php endif; ?>
+                                            
                                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">x<?= $item['quantity'] ?></p>
                                         </div>
                                         <div class="font-bold text-primary">
@@ -287,15 +331,22 @@ function getStatusBadge($status) {
                             </div>
 
                             <div class="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-gray-100 dark:border-gray-700 gap-4">
-                                <div class="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                                    ยอดคำสั่งซื้อทั้งหมด: <span class="text-lg font-bold text-primary font-display ml-1">฿<?= number_format($order['total_amount']) ?></span>
+                                <div class="flex flex-col text-sm text-gray-600 dark:text-gray-400 font-medium w-full sm:w-auto">
+                                    <div>ยอดคำสั่งซื้อทั้งหมด: <span class="text-lg font-bold text-primary font-display ml-1">฿<?= number_format($order['total_amount']) ?></span></div>
+                                    <?php if($order['status'] !== 'cancelled'): ?>
+                                        <div class="text-xs text-green-600 dark:text-green-400 font-bold mt-1 flex items-center gap-1">
+                                            <span class="material-icons-round text-[14px]">local_shipping</span> คาดว่าจะได้รับ: <?= $expectedDate ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
+                                
                                 <div class="flex gap-3 w-full sm:w-auto">
-                                    <a href="#" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 text-center transition-colors">ดูรายละเอียด</a>
+                                    <a href="orders_detail.php?id=<?= $order['order_id'] ?>" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700 text-center transition-colors">ดูรายละเอียด</a>
+                                    
                                     <?php if ($order['status'] === 'completed'): ?>
-                                        <a href="#" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-primary hover:bg-pink-600 text-white text-sm font-bold text-center transition-colors shadow-md">ซื้ออีกครั้ง</a>
+                                        <a href="../shop/products.php" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-primary hover:bg-pink-600 text-white text-sm font-bold text-center transition-colors shadow-md">ซื้ออีกครั้ง</a>
                                     <?php elseif ($order['status'] === 'pending'): ?>
-                                        <a href="payment.php" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-primary hover:bg-pink-600 text-white text-sm font-bold text-center transition-colors shadow-md">ชำระเงิน</a>
+                                        <a href="../shop/payment.php?order_id=<?= $order['order_id'] ?>" class="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-primary hover:bg-pink-600 text-white text-sm font-bold text-center transition-colors shadow-md">ชำระเงิน</a>
                                     <?php endif; ?>
                                 </div>
                             </div>

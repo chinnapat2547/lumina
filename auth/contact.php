@@ -1,16 +1,27 @@
 <?php
 session_start();
-// เรียกใช้ไฟล์เชื่อมต่อฐานข้อมูล
 require_once '../config/connectdbuser.php';
 
 // ==========================================
 // 1. จัดการข้อมูลผู้ใช้และตะกร้า (สำหรับ Navbar)
 // ==========================================
 $isLoggedIn = false;
+$isAdmin = false;
 $profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
 $userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
+$u_id = null;
+$totalCartItems = 0;
 
-if (isset($_SESSION['u_id'])) {
+// 🟢 แก้ที่ 4: ป้องกัน Admin เด้งหลุด
+if (isset($_SESSION['admin_id'])) {
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $u_id = $_SESSION['admin_id']; // กัน Error
+    $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
+    $userData['u_email'] = 'Administrator Mode';
+    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    
+} elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
     $u_id = $_SESSION['u_id'];
     
@@ -24,7 +35,8 @@ if (isset($_SESSION['u_id'])) {
         $resultUser = mysqli_stmt_get_result($stmtUser);
         if ($rowUser = mysqli_fetch_assoc($resultUser)) {
             $userData = $rowUser;
-            if (!empty($userData['u_image']) && file_exists("../profile/uploads/" . $userData['u_image'])) {
+            $physical_path = __DIR__ . "/../profile/uploads/" . $userData['u_image'];
+            if (!empty($userData['u_image']) && file_exists($physical_path)) {
                 $profileImage = "../profile/uploads/" . $userData['u_image'];
             } else {
                 $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=F43F85&color=fff";
@@ -33,16 +45,44 @@ if (isset($_SESSION['u_id'])) {
         mysqli_stmt_close($stmtUser);
     }
     
-$totalCartItems = 0;
     $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
     if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
         mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
         mysqli_stmt_execute($stmtCartCount);
         $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
         if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
-            $totalCartItems = $rowCartCount['total_qty'] ?? 0; // ถ้าเป็น null ให้เป็น 0
+            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
         }
         mysqli_stmt_close($stmtCartCount);
+    }
+}
+
+// ==========================================
+// 🟢 แก้ที่ 3: รับค่าการส่งข้อความ
+// ==========================================
+$messageStatus = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_message') {
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $subject = trim($_POST['subject'] ?? '');
+    $message = trim($_POST['message'] ?? '');
+
+    if (!empty($name) && !empty($email) && !empty($message)) {
+        $sqlInsertMsg = "INSERT INTO contact_messages (u_id, name, email, subject, message) VALUES (?, ?, ?, ?, ?)";
+        if ($stmtMsg = mysqli_prepare($conn, $sqlInsertMsg)) {
+            // ถ้าไม่ได้ล็อกอิน ให้ u_id เป็น null ไปก่อน (ใช้ user id จริงๆ ถ้ามี)
+            $bind_uid = $isLoggedIn && !$isAdmin ? $u_id : null;
+            
+            mysqli_stmt_bind_param($stmtMsg, "issss", $bind_uid, $name, $email, $subject, $message);
+            if (mysqli_stmt_execute($stmtMsg)) {
+                $messageStatus = 'success';
+            } else {
+                $messageStatus = 'error';
+            }
+            mysqli_stmt_close($stmtMsg);
+        }
+    } else {
+        $messageStatus = 'empty';
     }
 }
 ?>
@@ -54,6 +94,7 @@ $totalCartItems = 0;
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
         tailwind.config = {
             darkMode: "class",
@@ -75,27 +116,11 @@ $totalCartItems = 0;
                         body: ["Prompt", "sans-serif"],
                     },
                     borderRadius: {
-                        "DEFAULT": "1rem",
-                        "lg": "1.5rem",
-                        "xl": "2rem",
-                        "2xl": "2.5rem",
-                        "3xl": "3rem",
-                        "full": "9999px"
+                        "DEFAULT": "1rem", "lg": "1.5rem", "xl": "2rem", "2xl": "2.5rem", "3xl": "3rem", "full": "9999px"
                     },
                     boxShadow: {
                         'soft': '0 10px 40px -10px rgba(244, 63, 133, 0.15)',
                         'glow': '0 0 20px rgba(244, 63, 133, 0.3)',
-                    },
-                    animation: {
-                        'float': 'float 6s ease-in-out infinite',
-                        'float-delayed': 'float 6s ease-in-out 3s infinite',
-                        'bounce-slow': 'bounce 3s infinite',
-                    },
-                    keyframes: {
-                        float: {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-20px)' },
-                        }
                     }
                 },
             },
@@ -155,20 +180,11 @@ $totalCartItems = 0;
                 </button>
                 <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">TONERPADS (โทนเนอร์แพด)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">BLUSH (บลัชออน)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">LIPS (ริมฝีปาก)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">SKIN (ผิว)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">EYES (ตา)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">ACCESSORIES (อุปกรณ์เสริม)</a>
+                        <a href="../shop/products.php" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">ดูหมวดหมู่ทั้งหมด</a>
                     </div>
                 </div>
             </div>
 
-            <a class="group flex flex-col items-center justify-center transition" href="../shop/promotions.php">
-                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">โปรโมชั่น</span>
-                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Sale)</span>
-            </a>
             <a class="flex flex-col items-center justify-center cursor-default pointer-events-none">
                 <span class="text-[18px] font-bold text-primary dark:text-primary leading-tight">ติดต่อเรา</span>
                 <span class="text-[13px] text-primary/80 dark:text-primary/80">(Contact)</span>
@@ -192,7 +208,7 @@ $totalCartItems = 0;
             </button>
 
             <div class="relative group flex items-center">
-                <a href="../profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                     <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
                         <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
                     </div>
@@ -209,9 +225,6 @@ $totalCartItems = 0;
                         <div class="flex justify-center relative mb-4">
                             <div class="rounded-full p-[3px] bg-primary shadow-md">
                                 <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
-                                    <?php 
-                                        $displayName = $isLoggedIn ? $userData['u_username'] : 'ผ'; 
-                                    ?>
                                     <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
                                 </div>
                             </div>
@@ -222,39 +235,32 @@ $totalCartItems = 0;
                         </div>
 
                         <div class="flex flex-col gap-3 mt-2">
-                            <?php if($isLoggedIn): ?>
+                            <?php if($isAdmin): ?>
+                                <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    หน้าจัดการ (Admin)
+                                </a>
+                            <?php elseif($isLoggedIn): ?>
                                 <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
                                     จัดการบัญชี
                                 </a>
-                                <a href="logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span>
-                                    ออกจากระบบ
-                                </a>
                             <?php else: ?>
                                 <a href="login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span>
                                     เข้าสู่ระบบ
                                 </a>
-                                <a href="register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span>
-                                    สมัครสมาชิก
-                                </a>
                             <?php endif; ?>
-                        </div>
-
-                        <div class="flex justify-center items-center gap-2 mt-5 text-[11px] text-gray-400">
-                            <a href="#" class="hover:text-primary">นโยบายความเป็นส่วนตัว</a>
-                            <span>•</span>
-                            <a href="#" class="hover:text-primary">ข้อกำหนดบริการ</a>
+                            
+                            <?php if($isLoggedIn): ?>
+                            <a href="logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                ออกจากระบบ
+                            </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
-
+        </div>
     </div>
-</div>
 </nav>
-</header>
 
 <main class="flex-grow bg-cloud-pattern pb-12">
     <div class="relative w-full overflow-hidden bg-gradient-to-br from-pink-50 via-purple-50 to-pink-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 pt-16 pb-24 rounded-b-[3rem] shadow-soft mb-12 border-b border-pink-100 dark:border-gray-800">
@@ -278,7 +284,9 @@ $totalCartItems = 0;
             
             <div class="relative w-full md:w-1/2 flex justify-center md:justify-end">
                 <div class="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96">
-                    <img alt="Contact us illustration" class="w-full h-full object-contain drop-shadow-2xl animate-bounce-slow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBek-t0Fcaj95CLkhHwsz7_bptvZfd0ztsvO-57dEJlTb414jqsld9B8vpYS9un_yA0ZTB5bEz7S_g8ecB4xrZkaz-djg20-4s1sK7J_E0R2tRh_6kUSyqIGuBF2CEjNggFexgI_1drj-EwqwW_MbfdpwlZ8K9-ASnyiQ7qZsRdQj8-DJmWxXYCCAIttDn39k856-09MgJ5pTD0lM5gls5a3FkpxHVIT1mGYuX3K6W50CbeAPwcDzq-izWxhGqiH1AO2ZlJh8kA8C7y" style="mask-image: radial-gradient(circle, black 60%, transparent 100%); -webkit-mask-image: radial-gradient(circle, black 60%, transparent 100%);"/>
+                    <div class="w-full h-full rounded-full bg-white/40 dark:bg-gray-700/40 p-4 shadow-xl backdrop-blur-sm border-2 border-white/60 dark:border-gray-600 flex items-center justify-center">
+                        <span class="material-icons-round text-[150px] text-primary opacity-80">support_agent</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -350,39 +358,36 @@ $totalCartItems = 0;
                         <p class="text-gray-500 dark:text-gray-400">กรอกข้อมูลด้านล่าง ทีมงานจะรีบตอบกลับภายใน 24 ชม. ค่ะ</p>
                     </div>
                     
-                    <form action="#" class="space-y-6">
+                    <form action="contact.php" method="POST" class="space-y-6">
+                        <input type="hidden" name="action" value="send_message">
+                        
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">ชื่อ-นามสกุล</label>
-                                <input class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary/50 transition-all outline-none" placeholder="ระบุชื่อของคุณ" type="text"/>
+                                <input name="name" required value="<?= $isLoggedIn && !$isAdmin ? htmlspecialchars($userData['u_username']) : '' ?>" class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary/50 transition-all outline-none" placeholder="ระบุชื่อของคุณ" type="text"/>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">อีเมล</label>
-                                <input class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary/50 transition-all outline-none" placeholder="example@mail.com" type="email"/>
+                                <input name="email" required value="<?= $isLoggedIn && !$isAdmin ? htmlspecialchars($userData['u_email']) : '' ?>" class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary/50 transition-all outline-none" placeholder="example@mail.com" type="email"/>
                             </div>
                         </div>
                         
                         <div class="space-y-2">
                             <label class="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">หัวข้อ</label>
-                            <div class="relative">
-                                <select class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/50 transition-all appearance-none cursor-pointer outline-none">
-                                    <option>สอบถามข้อมูลทั่วไป</option>
-                                    <option>ติดตามคำสั่งซื้อ</option>
-                                    <option>แจ้งปัญหาการใช้งาน</option>
-                                    <option>อื่นๆ</option>
-                                </select>
-                                <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-500">
-                                    <span class="material-icons-round">expand_more</span>
-                                </div>
-                            </div>
+                            <select name="subject" required class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer outline-none">
+                                <option value="สอบถามข้อมูลทั่วไป">สอบถามข้อมูลทั่วไป</option>
+                                <option value="ติดตามคำสั่งซื้อ">ติดตามคำสั่งซื้อ</option>
+                                <option value="แจ้งปัญหาการใช้งาน">แจ้งปัญหาการใช้งาน</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
                         </div>
                         
                         <div class="space-y-2">
                             <label class="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">ข้อความ</label>
-                            <textarea class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary/50 transition-all resize-none outline-none" placeholder="พิมพ์ข้อความของคุณที่นี่..." rows="4"></textarea>
+                            <textarea name="message" required class="w-full bg-pink-50/50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary/50 transition-all resize-none outline-none" placeholder="พิมพ์ข้อความของคุณที่นี่..." rows="4"></textarea>
                         </div>
                         
-                        <button class="w-full bg-primary hover:bg-pink-600 text-white font-bold text-lg rounded-2xl py-4 shadow-md shadow-primary/30 transform active:scale-95 transition-all flex items-center justify-center gap-2 group" type="button">
+                        <button type="submit" class="w-full bg-primary hover:bg-pink-600 text-white font-bold text-lg rounded-2xl py-4 shadow-md shadow-primary/30 transform active:scale-95 transition-all flex items-center justify-center gap-2 group">
                             <span>ส่งข้อความ</span>
                             <span class="material-icons-round group-hover:translate-x-1 transition-transform">send</span>
                         </button>
@@ -391,17 +396,6 @@ $totalCartItems = 0;
             </div>
         </div>
 </main>
-
-<div class="fixed bottom-6 right-6 z-50 flex items-end gap-3 animate-[fade-in-up_0.5s_ease-out]">
-    <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-br-none shadow-soft mb-4 hidden md:block relative border border-pink-50 dark:border-gray-700">
-        <p class="text-sm font-bold text-gray-700 dark:text-gray-300">👋 คุยกับเราตอนนี้!</p>
-        <div class="absolute -bottom-2 right-0 w-4 h-4 bg-white dark:bg-gray-800 transform rotate-45 border-b border-r border-pink-50 dark:border-gray-700"></div>
-    </div>
-    <button class="w-16 h-16 bg-gradient-to-tr from-primary to-pink-400 rounded-full shadow-lg shadow-primary/40 flex items-center justify-center text-white hover:scale-110 transition-transform cursor-pointer relative">
-        <span class="material-icons-round text-[32px]">forum</span>
-        <span class="absolute top-0 right-0 w-4 h-4 bg-green-400 border-2 border-white rounded-full"></span>
-    </button>
-</div>
 
 <footer class="bg-white dark:bg-surface-dark py-10 border-t border-pink-50 dark:border-gray-800 relative z-20">
     <div class="max-w-7xl mx-auto px-4 text-center">
@@ -414,7 +408,7 @@ $totalCartItems = 0;
 </footer>
 
 <script>
-    // Script สลับ Dark Mode
+    // สลับ Dark Mode
     if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.classList.add('dark');
     }
@@ -423,5 +417,26 @@ $totalCartItems = 0;
         htmlEl.classList.toggle('dark');
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
+
+    // 🟢 เช็คว่ามีการส่งข้อความหรือไม่ เพื่อโชว์แจ้งเตือน 🟢
+    <?php if ($messageStatus === 'success'): ?>
+        Swal.fire({
+            icon: 'success',
+            title: 'ส่งข้อความสำเร็จ!',
+            text: 'เราได้รับข้อความของคุณแล้ว ทีมงานจะรีบติดต่อกลับโดยเร็วที่สุด',
+            confirmButtonColor: '#F43F85',
+            customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-full px-6 font-bold' }
+        }).then(() => {
+            window.location.href = 'contact.php'; // รีเฟรชหน้าเพื่อล้างฟอร์ม
+        });
+    <?php elseif ($messageStatus === 'error'): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด!',
+            text: 'ไม่สามารถส่งข้อความได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง',
+            confirmButtonColor: '#F43F85',
+            customClass: { popup: 'rounded-3xl', confirmButton: 'rounded-full px-6 font-bold' }
+        });
+    <?php endif; ?>
 </script>
 </body></html>
