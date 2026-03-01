@@ -268,21 +268,20 @@ $stat_total = count($customers);
                     <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
                 </button>
                 
-                <a href="#" class="block w-11 h-11 rounded-full bg-gradient-to-tr from-purple-400 to-indigo-400 p-[2px] shadow-sm hover:shadow-glow hover:scale-105 transition-all cursor-pointer">
+                <div class="relative group flex items-center">
+                    <a href="#" class="block w-11 h-11 rounded-full bg-gradient-to-tr from-purple-400 to-indigo-400 p-[2px] shadow-sm hover:shadow-glow hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full overflow-hidden">
                             <img alt="Admin Profile" class="w-full h-full rounded-full object-cover" src="<?= $adminAvatar ?>"/>
                         </div>
                     </a>
                     
                     <div class="absolute right-0 hidden pt-4 top-full w-[300px] z-50 group-hover:block cursor-default">
-                        <div class="bg-white dark:bg-surface-dark rounded-3xl shadow-soft border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
-                            
+                        <div class="bg-surface-white dark:bg-surface-dark rounded-3xl shadow-soft border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
                             <div class="text-center mb-4">
                                 <span class="text-sm font-bold text-purple-500 bg-purple-50 dark:bg-purple-900/30 px-3 py-1 rounded-full border border-purple-100 dark:border-purple-800/50">
                                     Administrator Mode
                                 </span>
                             </div>
-
                             <div class="flex justify-center relative mb-3">
                                 <div class="rounded-full p-[3px] bg-purple-500 shadow-md">
                                     <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-16 h-16 overflow-hidden">
@@ -290,12 +289,9 @@ $stat_total = count($customers);
                                     </div>
                                 </div>
                             </div>
-
                             <div class="text-center mb-6">
-                                <h3 class="text-[20px] font-bold text-gray-800 dark:text-white">สวัสดี, คุณ <?= htmlspecialchars($adminName) ?></h3>
-                                <p class="text-xs text-gray-500 mt-1">ผู้จัดการระบบสูงสุด</p>
+                                <h3 class="text-[20px] font-bold text-gray-800 dark:text-white">สวัสดี, คุณ <?= htmlspecialchars($adminName ?? 'Admin') ?></h3>
                             </div>
-
                             <div class="flex flex-col gap-3">
                                 <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-red-500">
                                     <span class="material-icons-round text-[18px]">logout</span> ออกจากระบบ
@@ -303,7 +299,7 @@ $stat_total = count($customers);
                             </div>
                         </div>
                     </div>
-                </div>
+                    </div>
             </div>
         </header>
 
