@@ -251,9 +251,6 @@ function getPaymentMethodIcon($method) {
 <main class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
     
     <div class="flex flex-col mb-6 gap-2">
-        <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
-            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
-        </a>
         <div>
             <div class="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <a href="account.php" class="hover:text-primary transition">บัญชีของฉัน</a>
@@ -265,6 +262,9 @@ function getPaymentMethodIcon($method) {
             <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">คำสั่งซื้อ #<?= htmlspecialchars($order['order_no']) ?></h1>
             <p class="text-gray-500 dark:text-gray-400 text-sm">สั่งซื้อเมื่อ <?= $formatted_date ?></p>
         </div>
+        <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
+            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
+        </a>
     </div>
 
     <div class="<?= $badge['color'] ?> border rounded-[2rem] p-6 mb-8 flex items-center gap-4 shadow-sm">
@@ -314,7 +314,7 @@ function getPaymentMethodIcon($method) {
                                 <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">หมวดหมู่: <?= htmlspecialchars($item['c_name'] ?? 'ไม่ระบุ') ?></p>
                                 
                                 <?php if (!empty($item['selected_color'])): ?>
-                                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
+                                    <p class="text-xs font-bold text-primary bg-pink-100 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md mt-1 shadow-sm border border-pink-200 dark:border-gray-600">ตัวเลือก: <?= htmlspecialchars($item['selected_color']) ?></p>
                                 <?php endif; ?>
                                 
                                 <div class="flex justify-between items-end mt-2">

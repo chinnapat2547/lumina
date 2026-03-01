@@ -176,7 +176,10 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         // 🟢 แก้ไข: เพิ่ม shipping_address 🟢
         $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, shipping_address, total_amount, status, payment_method, shipping_method, slip_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         if ($stmtOrder = mysqli_prepare($conn, $sqlInsertOrder)) {
-            mysqli_stmt_bind_param($stmtOrder, "sisdsiss", $orderNo, $u_id, $addr, $netTotal, $status, $pm, $sm, $slip_name);
+            
+            // 🟢 จุดที่แก้ปัญหา: เปลี่ยนจาก "sisdsiss" เป็น "sisdssss" 🟢
+            // อธิบาย: s(orderNo), i(u_id), s(addr), d(netTotal), s(status), s(pm), s(sm), s(slip_name)
+            mysqli_stmt_bind_param($stmtOrder, "sisdssss", $orderNo, $u_id, $addr, $netTotal, $status, $pm, $sm, $slip_name);
             
             if(mysqli_stmt_execute($stmtOrder)) {
                 $newOrderId = mysqli_insert_id($conn);
