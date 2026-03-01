@@ -263,7 +263,7 @@ $netTotal = $totalPrice + $shippingFee; // ยอดสุทธิ
                                     <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
                                 </a>
                             <?php elseif($isLoggedIn): ?>
-                                <a href="profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
                                     จัดการบัญชี
                                 </a>
                             <?php else: ?>
