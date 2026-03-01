@@ -16,10 +16,11 @@ $totalCartItems = 0;
 if (isset($_SESSION['admin_id'])) {
     $isLoggedIn = true;
     $isAdmin = true;
-    $u_id = $_SESSION['admin_id']; // กัน Error
     $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
     $userData['u_email'] = 'Administrator Mode';
-    $profileImage = "/../admin/admin.jpg/" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    
+    // 🟢 แก้บรรทัดนี้: ลบพวก urlencode และสีพื้นหลังออกให้หมด เหลือแค่ Path รูป
+    $profileImage = "../admin/admin.jpg"; 
     
 } elseif (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
