@@ -242,8 +242,8 @@ $activeTab = $_GET['tab'] ?? 'store';
                         <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
                         <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
                     </div>
-                    <?php if($newOrders > 0): ?>
-                        <span class="bg-primary text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newOrders ?></span>
+                    <?php if(isset($countPending) && $countPending > 0): ?>
+                        <span class="flex items-center justify-center w-6 h-6 bg-primary text-white text-[12px] font-black rounded-full shadow-sm"><?= $countPending ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted dark:text-gray-400 transition-all duration-300 group hover:pl-6" href="manage_customers.php">
