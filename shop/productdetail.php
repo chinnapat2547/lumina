@@ -251,8 +251,8 @@ if ($isLoggedIn) {
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-4">
-                <a href="favorites.php" id="nav-fav-icon" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center">
-                    <span class="material-icons-round text-2xl transition-transform duration-300">favorite_border</span>
+                <a href="favorites.php" id="nav-fav-icon" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center group">
+                    <span class="material-icons-round text-2xl transition-transform duration-300 group-hover:scale-110">favorite_border</span>
                 </a>
                 <a href="cart.php" id="nav-cart-icon" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
                     <span class="material-icons-round text-2xl transition-transform duration-300">shopping_bag</span>
@@ -715,26 +715,33 @@ if ($isLoggedIn) {
         const favBtn = document.getElementById('fav-btn');
         const favIcon = document.getElementById('fav-icon');
         const isCurrentlyFav = favIcon.innerText === 'favorite';
+        const navHeart = document.querySelector('#nav-fav-icon span');
 
-        // 1. เปลี่ยน UI ทันทีที่กด (สลับสี / สลับไอคอนทึบ-โปร่ง)
         if (isCurrentlyFav) {
-            // ยกเลิกถูกใจ -> เปลี่ยนเป็นสีเทา
+            // 1. กดยกเลิกถูกใจ -> เปลี่ยนปุ่มกลับเป็นสีเทา
             favIcon.innerText = 'favorite_border';
             favBtn.classList.remove('border-primary', 'bg-pink-50', 'text-primary');
             favBtn.classList.add('border-gray-200', 'dark:border-gray-600', 'text-gray-400', 'bg-white', 'dark:bg-gray-800');
+            
+            // เอฟเฟกต์กระตุกไอคอน Navbar เล็กน้อย
+            navHeart.classList.add('scale-90');
+            setTimeout(() => navHeart.classList.remove('scale-90'), 200);
+            
         } else {
-            // กดถูกใจ -> เปลี่ยนเป็นสีชมพูและเด้งแอนิเมชัน
+            // 2. กดถูกใจ -> เปลี่ยนปุ่มเป็นสีชมพู พร้อมแอนิเมชันรูปลอย
             flyToIcon('nav-fav-icon');
             favIcon.innerText = 'favorite';
             favBtn.classList.remove('border-gray-200', 'dark:border-gray-600', 'text-gray-400', 'bg-white', 'dark:bg-gray-800');
             favBtn.classList.add('border-primary', 'bg-pink-50', 'text-primary');
             
-            // อัปเดตไอคอนหัวใจที่ Navbar ด้านบน
-            const navHeart = document.querySelector('#nav-fav-icon span');
-            setTimeout(() => { navHeart.innerText = 'favorite'; navHeart.classList.add('text-primary'); }, 800);
+            // เอฟเฟกต์เด้งไอคอน Navbar (เด้งชั่วคราว ไม่ค้างถาวร)
+            setTimeout(() => {
+                navHeart.classList.add('scale-125', 'text-primary');
+                setTimeout(() => navHeart.classList.remove('scale-125', 'text-primary'), 300);
+            }, 800);
         }
 
-        // 2. ส่งข้อมูลไปประมวลผลเบื้องหลัง
+        // 3. ส่งข้อมูลบันทึกลง Database แบบไม่รีเฟรชหน้า (เงียบๆ)
         const formData = new FormData();
         formData.append('action', 'toggle_fav');
         formData.append('p_id', '<?= $p_id ?>');
@@ -742,7 +749,7 @@ if ($isLoggedIn) {
         fetch('favorites.php', {
             method: 'POST',
             body: formData
-        }); // จบแค่นี้ ไม่ต้องมี .then() เพื่อแจ้งเตือน
+        });
     }
 </script>
 </body>
