@@ -329,7 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-primary opacity-80 uppercase mb-1">อีเมล</p>
-                                <p class="text-gray-700 dark:text-white font-bold text-lg">hello@luminabeauty.com</p>
+                                <p class="text-gray-700 dark:text-white font-bold text-lg">support@luminabeauty.com</p>
                             </div>
                         </div>
                     </div>

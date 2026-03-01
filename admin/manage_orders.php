@@ -481,7 +481,7 @@ function getPaymentMethodText($method) {
                         <div class="flex gap-6 items-start">
                             <div class="w-28 h-36 bg-gray-50 dark:bg-gray-700 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-600 flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-80 transition shadow-inner" onclick="window.open(document.getElementById('md_slip_img').src, '_blank')">
                                 <img id="md_slip_img" src="" alt="Slip" class="w-full h-full object-cover hidden">
-                                <span id="md_slip_none" class="text-xs text-gray-400 font-medium text-center px-2 leading-relaxed">ไม่มีรูปสลิป<br>ไม่ได้โอน</span>
+                                <span id="md_slip_none" class="text-xs text-gray-400 font-medium text-center px-2 leading-relaxed">ไม่มีรูปสลิป</span>
                             </div>
                             <div class="space-y-4 flex-1">
                                 <div>
