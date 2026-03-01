@@ -269,13 +269,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-[#1b0d14] dark:text-[#f3e7ed] antialiased min-h-screen flex flex-col">
 
-    <div class="w-full p-6 md:px-10 lg:px-12">
-        <a href="../home.php" class="inline-flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity w-fit">
+<nav class="sticky top-0 z-50 bg-gradient-to-r from-[#fff0f6]/90 to-[#f3e7ff]/90 dark:from-[#2d1622]/90 dark:to-[#221019]/90 backdrop-blur-md border-b border-[#e7cfdb] dark:border-[#5a3a4a] font-prompt shadow-sm">
+    <div class="w-full px-6 md:px-10 lg:px-16"> 
+        <div class="flex justify-between items-center h-20 w-full">
+        <a href="../home.php" class="flex-shrink-0 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
             <span class="material-icons-round text-primary text-4xl">spa</span>
             <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
         </a>
     </div>
-
+</div>
+</nav>
 <div class="flex flex-1 w-full flex-row overflow-hidden">
     
 <div id="visual-container" class="hidden lg:flex w-1/2 relative bg-gradient-to-br from-[#ffecd2] via-[#fcb69f] to-[#e0c3fc] items-center justify-center overflow-hidden">
