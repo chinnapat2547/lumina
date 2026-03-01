@@ -5,28 +5,52 @@ require_once '../config/connectdbuser.php';
 // ==========================================
 // 1. ตรวจสอบล็อกอินและเตรียมข้อมูล Navbar
 // ==========================================
-if (!isset($_SESSION['u_id'])) {
-    header("Location: ../auth/login.php");
-    exit();
-}
-
-$u_id = $_SESSION['u_id'];
-$profileImage = "https://ui-avatars.com/api/?name=User&background=F43F85&color=fff";
+$isLoggedIn = false;
+$isAdmin = false;
+$profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
+$userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
 $totalCartItems = 0;
 
-$sqlUser = "SELECT u_username, u_image FROM `user` RIGHT JOIN `account` ON user.u_id = account.u_id WHERE account.u_id = ?";
-if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
-    mysqli_stmt_bind_param($stmtUser, "i", $u_id);
-    mysqli_stmt_execute($stmtUser);
-    $resUser = mysqli_stmt_get_result($stmtUser);
-    if ($rowUser = mysqli_fetch_assoc($resUser)) {
-        if (!empty($rowUser['u_image']) && file_exists("../uploads/" . $rowUser['u_image'])) {
-            $profileImage = "../uploads/" . $rowUser['u_image'];
-        } else {
-            $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($rowUser['u_username']) . "&background=F43F85&color=fff";
+if (isset($_SESSION['admin_id'])) {
+    $isLoggedIn = true;
+    $isAdmin = true;
+    $userData['u_username'] = $_SESSION['admin_username'] ?? 'Admin';
+    $userData['u_email'] = 'Administrator Mode';
+    $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=a855f7&color=fff";
+    
+} elseif (isset($_SESSION['u_id'])) {
+    $isLoggedIn = true;
+    $u_id = $_SESSION['u_id'];
+    
+    $sqlUser = "SELECT a.u_username, a.u_email, u.u_image FROM `account` a LEFT JOIN `user` u ON a.u_id = u.u_id WHERE a.u_id = ?";
+    if ($stmtUser = mysqli_prepare($conn, $sqlUser)) {
+        mysqli_stmt_bind_param($stmtUser, "i", $u_id);
+        mysqli_stmt_execute($stmtUser);
+        $resultUser = mysqli_stmt_get_result($stmtUser);
+        
+        if ($rowUser = mysqli_fetch_assoc($resultUser)) {
+            $userData = $rowUser;
+            
+            $physical_path = __DIR__ . "/../profile/uploads/" . $userData['u_image'];
+            if (!empty($userData['u_image']) && file_exists($physical_path)) {
+                $profileImage = "../profile/uploads/" . $userData['u_image'];
+            } else {
+                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=F43F85&color=fff";
+            }
         }
+        mysqli_stmt_close($stmtUser);
     }
-    mysqli_stmt_close($stmtUser);
+    
+    $sqlCartCount = "SELECT SUM(quantity) as total_qty FROM `cart` WHERE u_id = ?";
+    if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
+        mysqli_stmt_bind_param($stmtCartCount, "i", $u_id);
+        mysqli_stmt_execute($stmtCartCount);
+        $resultCartCount = mysqli_stmt_get_result($stmtCartCount);
+        if ($rowCartCount = mysqli_fetch_assoc($resultCartCount)) {
+            $totalCartItems = $rowCartCount['total_qty'] ?? 0;
+        }
+        mysqli_stmt_close($stmtCartCount);
+    }
 }
 
 // ==========================================
@@ -51,7 +75,6 @@ if ($stmtCart = mysqli_prepare($conn, $sqlCart)) {
 // ==========================================
 // 3. รับค่าจากหน้า checkout.php
 // ==========================================
-// ถ้ามีการส่งข้อมูลมาจากหน้า checkout สดๆ ร้อนๆ ให้รีเซ็ตสถานะเก่าทิ้ง เพื่อรับออเดอร์ใหม่
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['shipping_address'])) {
     unset($_SESSION['order_saved']);
     unset($_SESSION['last_order_no']);
@@ -71,7 +94,6 @@ if (!$checkoutData || count($cartItems) == 0) {
     }
 }
 
-// 🟢 คำนวณราคาสุทธิ (กฎครบ 1,000 ส่งฟรี/ด่วนลด 50)
 $isFreeShippingEligible = ($subtotal >= 1000);
 if ($checkoutData['shipping_method'] == 'express') {
     $shippingCost = $isFreeShippingEligible ? 50 : 100;
@@ -88,38 +110,53 @@ $slip_name = null;
 // ==========================================
 // 4. ลอจิกการตรวจสอบและบันทึกข้อมูล
 // ==========================================
-// เช็คว่าเคยเซฟออเดอร์นี้ไปแล้วหรือยังในการโหลดหน้านี้ครั้งก่อนหน้า
 if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
     $payment_status = 'success';
     $orderNo = $_SESSION['last_order_no'] ?? 'N/A';
-    $totalCartItems = 0; // ตะกร้าว่างแล้ว
+    $totalCartItems = 0; 
 } else {
-    // ก. ถ้าเป็นแบบ บัตรเครดิต หรือ เก็บเงินปลายทาง -> เซฟออเดอร์ได้เลย
     if (in_array($checkoutData['payment_method'], ['credit_card', 'cod'])) {
         $should_save_order = true;
     } 
-    // ข. ถ้าเป็นแบบ โอนเงิน/PromptPay -> ต้องรอรับสลิปโอนเงินก่อน
     elseif ($checkoutData['payment_method'] === 'promptpay') {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] == 'upload_slip') {
             if (isset($_FILES['slip_image']) && $_FILES['slip_image']['error'] == 0) {
-                $uploadDir = '../uploads/slips/';
-                if (!is_dir($uploadDir)) { mkdir($uploadDir, 0777, true); }
                 
-                $ext = pathinfo($_FILES['slip_image']['name'], PATHINFO_EXTENSION);
-                $slip_name = "slip_" . time() . "_" . $u_id . "." . $ext;
+                // 🟢 แก้ที่ 2: ตรวจสอบนามสกุล, ชนิดไฟล์ และขนาดไฟล์สลิป 🟢
+                $allowed_ext = ['jpg', 'jpeg', 'png', 'webp'];
+                $allowed_mime = ['image/jpeg', 'image/png', 'image/webp'];
+                $max_size = 2 * 1024 * 1024; // 2MB
                 
-                if(move_uploaded_file($_FILES['slip_image']['tmp_name'], $uploadDir . $slip_name)){
-                    $should_save_order = true; // อัปโหลดผ่าน พร้อมเซฟออเดอร์
-                } else {
+                $file_name = $_FILES['slip_image']['name'];
+                $file_size = $_FILES['slip_image']['size'];
+                $file_tmp = $_FILES['slip_image']['tmp_name'];
+                $file_type = mime_content_type($file_tmp);
+                $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                
+                if ($file_size > $max_size) {
                     $payment_status = 'failed';
-                    $error_msg = "ระบบขัดข้อง: ไม่สามารถบันทึกไฟล์รูปภาพสลิปได้";
+                    $error_msg = "ขนาดไฟล์สลิปใหญ่เกินไป (ต้องไม่เกิน 2MB)";
+                } elseif (!in_array($ext, $allowed_ext) || !in_array($file_type, $allowed_mime)) {
+                    $payment_status = 'failed';
+                    $error_msg = "รองรับเฉพาะไฟล์รูปภาพ (JPG, JPEG, PNG, WEBP) เท่านั้น";
+                } else {
+                    $uploadDir = '../uploads/slips/';
+                    if (!is_dir($uploadDir)) { mkdir($uploadDir, 0777, true); }
+                    
+                    $slip_name = "slip_" . time() . "_" . $u_id . "." . $ext;
+                    
+                    if(move_uploaded_file($file_tmp, $uploadDir . $slip_name)){
+                        $should_save_order = true; 
+                    } else {
+                        $payment_status = 'failed';
+                        $error_msg = "ระบบขัดข้อง: ไม่สามารถบันทึกไฟล์รูปภาพสลิปได้";
+                    }
                 }
             } else {
                 $payment_status = 'failed';
                 $error_msg = "กรุณาแนบไฟล์สลิปหลักฐานการโอนเงิน เพื่อยืนยันการสั่งซื้อ";
             }
         } else {
-            // ยังไม่ได้กดแนบสลิป ให้อยู่หน้า pending รอโอนเงิน
             $payment_status = 'pending';
         }
     }
@@ -129,11 +166,13 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
     // ==========================================
     if ($should_save_order) {
         $orderNo = "ORD" . date('Ymd') . rand(1000, 9999);
-        $status = ($checkoutData['payment_method'] == 'cod') ? 'pending' : 'processing';
+        
+        // 🟢 แก้ที่ 3: ให้สถานะเป็น processing ทั้งหมด (COD ก็จะเป็น 'ที่ต้องจัดส่ง' ไม่ค้าง 'รอชำระ') 🟢
+        $status = 'processing';
+        
         $pm = $checkoutData['payment_method'];
         $sm = $checkoutData['shipping_method'];
         
-        // 1. บันทึกออเดอร์หลัก (เพิ่มคอลัมน์ช่องทางชำระเงิน, จัดส่ง, สลิป)
         $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, total_amount, status, payment_method, shipping_method, slip_image) VALUES (?, ?, ?, ?, ?, ?, ?)";
         if ($stmtOrder = mysqli_prepare($conn, $sqlInsertOrder)) {
             mysqli_stmt_bind_param($stmtOrder, "sidsiss", $orderNo, $u_id, $netTotal, $status, $pm, $sm, $slip_name);
@@ -141,18 +180,15 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             if(mysqli_stmt_execute($stmtOrder)) {
                 $newOrderId = mysqli_insert_id($conn);
                 
-                // 2. บันทึกสินค้าในตะกร้า และ ตัดสต๊อก (แก้ชื่อคอลัมน์เป็น price และ p_image ให้ตรงกับตาราง order_items)
                 foreach ($cartItems as $item) {
                     $img = $item['p_image'] ?? '';
                     $sqlInsertItem = "INSERT INTO `order_items` (order_id, p_id, p_name, p_image, price, quantity) VALUES (?, ?, ?, ?, ?, ?)";
                     if ($stmtItem = mysqli_prepare($conn, $sqlInsertItem)) {
-                        // iisdsi = int, int, string, string, double, int
                         mysqli_stmt_bind_param($stmtItem, "iisdsi", $newOrderId, $item['p_id'], $item['p_name'], $img, $item['p_price'], $item['quantity']);
                         mysqli_stmt_execute($stmtItem);
                         mysqli_stmt_close($stmtItem);
                     }
                     
-                    // อัปเดตตัดสต๊อก
                     $sqlUpdateStock = "UPDATE `product` SET p_stock = p_stock - ? WHERE p_id = ?";
                     if ($stmtStock = mysqli_prepare($conn, $sqlUpdateStock)) {
                         mysqli_stmt_bind_param($stmtStock, "ii", $item['quantity'], $item['p_id']);
@@ -161,7 +197,6 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                     }
                 }
                 
-                // 3. ลบของออกจากตะกร้า
                 $sqlClearCart = "DELETE FROM `cart` WHERE u_id = ?";
                 if ($stmtClear = mysqli_prepare($conn, $sqlClearCart)) {
                     mysqli_stmt_bind_param($stmtClear, "i", $u_id);
@@ -169,7 +204,6 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                     mysqli_stmt_close($stmtClear);
                 }
                 
-                // มาร์คสถานะว่าสำเร็จแล้ว
                 $_SESSION['order_saved'] = true;
                 $_SESSION['last_order_no'] = $orderNo;
                 $payment_status = 'success';
@@ -247,23 +281,35 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             
             <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-10">
                 <a class="group flex flex-col items-center justify-center transition" href="products.php">
-                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">สินค้า</span>
+                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">สินค้า</span>
+                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Shop)</span>
                 </a>
+                <div class="relative group">
+                    <button class="flex flex-col items-center justify-center transition pb-1 pt-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">หมวดหมู่</span>
+                            <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
+                        </div>
+                        <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Categories)</span>
+                    </button>
+                </div>
                 <a class="group flex flex-col items-center justify-center transition" href="promotions.php">
-                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">โปรโมชั่น</span>
+                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">โปรโมชั่น</span>
+                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Sale)</span>
                 </a>
                 <a class="group flex flex-col items-center justify-center transition" href="../contact.php">
-                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">ติดต่อเรา</span>
+                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">ติดต่อเรา</span>
+                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Contact)</span>
                 </a>
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-4">
-                <a href="favorites.php" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center">
-                    <span class="material-icons-round text-2xl">favorite_border</span>
+                <a href="favorites.php" id="nav-fav-icon" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center group">
+                    <span class="material-icons-round text-2xl transition-transform duration-300 group-hover:scale-110">favorite_border</span>
                 </a>
-                <a href="cart.php" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
-                    <span class="material-icons-round text-2xl">shopping_bag</span>
-                    <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800"><?= $totalCartItems ?></span>
+                <a href="cart.php" id="nav-cart-icon" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
+                    <span class="material-icons-round text-2xl transition-transform duration-300">shopping_bag</span>
+                    <span id="cart-badge" class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800 transition-transform duration-300"><?= $totalCartItems ?></span>
                 </a>
                 <button class="w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all" onclick="toggleTheme()">
                     <span class="material-icons-round dark:hidden text-2xl">dark_mode</span>
@@ -271,7 +317,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                 </button>
                 
                 <div class="relative group flex items-center">
-                    <a href="../profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
                             <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=ec2d88&color=fff'"/>
                         </div>
@@ -281,6 +327,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         </div>
     </div>
 </header>
+
 <main class="max-w-4xl mx-auto w-full px-4 pb-20 lg:px-8">
     
     <div class="mb-10 mt-4">
@@ -315,7 +362,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                 <div class="w-40 h-40 bg-white mx-auto rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center p-2 relative">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
+                    <img src="../profile/qr.JPEG" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
                     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-sm border border-gray-100">
                         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/PromptPay_logo.svg/1024px-PromptPay_logo.svg.png" class="h-4">
                     </div>
@@ -324,13 +371,13 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                 <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm text-left h-full flex flex-col justify-center border border-gray-100 dark:border-gray-600">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                            <span class="material-icons-round text-green-600 text-sm">account_balance</span>
+                            <span class="material-icons-round text-primary text-sm">account_balance</span>
                         </div>
-                        <span class="font-bold text-gray-800 dark:text-white">ธนาคารกสิกรไทย</span>
+                        <span class="font-bold text-gray-800 dark:text-white">ธนาคารกรุงเทพ</span>
                     </div>
                     <div class="flex justify-between items-center mb-1">
-                        <span class="text-lg font-mono text-gray-700 dark:text-gray-300 font-bold tracking-widest">123-4-56789-0</span>
-                        <button type="button" class="text-primary hover:text-pink-600 transition-colors" onclick="navigator.clipboard.writeText('1234567890'); alert('คัดลอกเลขบัญชีแล้ว');"><span class="material-icons-round text-[20px]">content_copy</span></button>
+                        <span class="text-lg font-mono text-gray-700 dark:text-gray-300 font-bold tracking-widest">414-425-3830</span>
+                        <button type="button" class="text-primary hover:text-pink-600 transition-colors" onclick="navigator.clipboard.writeText('4144253830'); alert('คัดลอกเลขบัญชีแล้ว');"><span class="material-icons-round text-[20px]">content_copy</span></button>
                     </div>
                     <p class="text-xs text-gray-500">ชื่อบัญชี: บจก. ลูมิน่า บิวตี้</p>
                 </div>
@@ -340,13 +387,13 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         <form action="" method="POST" enctype="multipart/form-data" class="max-w-sm mx-auto">
             <input type="hidden" name="action" value="upload_slip">
             <label class="upload-area block w-full rounded-2xl cursor-pointer p-6 mb-6 group bg-white dark:bg-gray-800 relative overflow-hidden shadow-sm">
-                <input type="file" name="slip_image" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" id="slipInput" onchange="previewFileName(this)">
+                <input type="file" name="slip_image" class="absolute inset-0 opacity-0 cursor-pointer" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" id="slipInput" onchange="previewFileName(this)">
                 <div class="flex flex-col items-center gap-3">
                     <div class="w-14 h-14 bg-pink-50 dark:bg-gray-700 text-primary rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
                         <span class="material-icons-round text-3xl">cloud_upload</span>
                     </div>
                     <span class="font-bold text-gray-700 dark:text-gray-200 text-sm" id="fileNameText">คลิกเพื่ออัปโหลดสลิปโอนเงิน</span>
-                    <span class="text-xs text-gray-400">รองรับไฟล์ JPG, PNG</span>
+                    <span class="text-xs text-gray-400">รองรับไฟล์ JPG, JPEG, PNG, WEBP (ไม่เกิน 2MB)</span>
                 </div>
             </label>
 
@@ -417,11 +464,22 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
-    // เปลี่ยนข้อความเมื่อเลือกไฟล์สลิป และทำให้กรอบเป็นสีชมพู
     function previewFileName(input) {
         const textSpan = document.getElementById('fileNameText');
         const uploadArea = input.closest('.upload-area');
         if (input.files && input.files[0]) {
+            
+            // ดักจับขนาดไฟล์ด้วย JS ก่อนส่งไป PHP ช่วยลดภาระเซิร์ฟเวอร์
+            if(input.files[0].size > 2097152){
+                alert("ขนาดไฟล์ใหญ่เกิน 2MB กรุณาเลือกไฟล์ใหม่");
+                input.value = "";
+                textSpan.textContent = "คลิกเพื่ออัปโหลดสลิปโอนเงิน";
+                textSpan.classList.remove('text-primary');
+                uploadArea.classList.remove('active', 'bg-pink-50/50', 'border-primary');
+                uploadArea.classList.add('bg-white');
+                return;
+            }
+            
             textSpan.textContent = "อัปโหลดแล้ว: " + input.files[0].name;
             textSpan.classList.add('text-primary');
             uploadArea.classList.add('active', 'bg-pink-50/50', 'border-primary');
