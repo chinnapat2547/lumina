@@ -287,9 +287,6 @@ if (isset($_GET['chart_days'])) {
                             </div>
 
                             <div class="flex flex-col gap-3">
-                                <a href="#" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-purple-500">
-                                    <span class="material-icons-round text-[18px]">manage_accounts</span> จัดการบัญชี
-                                </a>
                                 <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-red-500">
                                     <span class="material-icons-round text-[18px]">logout</span> ออกจากระบบ
                                 </a>
