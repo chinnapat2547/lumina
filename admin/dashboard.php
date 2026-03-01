@@ -217,9 +217,6 @@ if (isset($_GET['chart_days'])) {
                         <span class="material-icons-round group-hover:scale-110 transition-transform">forum</span>
                         <span class="font-medium text-[15px]">คำร้องเรียน</span>
                     </div>
-                    <?php if($newComplaints > 0): ?>
-                        <span class="bg-primary text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newComplaints ?></span>
-                    <?php endif; ?>
                 </a>
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted dark:text-gray-400 transition-all duration-300 group hover:pl-6 mt-2" href="settings.php">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">settings</span>
