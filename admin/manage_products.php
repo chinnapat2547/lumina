@@ -348,6 +348,17 @@ while($p = mysqli_fetch_assoc($resProd)) {
             </nav>
         </div>
 
+        <div class="p-5 rounded-2xl bg-gradient-to-br from-pink-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border border-pink-100 dark:border-gray-700 flex items-center gap-3 shadow-sm">
+            <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center text-primary shadow-sm">
+                <span class="material-icons-round text-xl">support_agent</span>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-primary dark:text-pink-400">ต้องการความช่วยเหลือ</p>
+                <p class="text-xs text-text-muted dark:text-gray-400">ติดต่อทีมพัฒนาระบบ</p>
+            </div>
+        </div>
+    </aside>
+
     <main class="flex-1 flex flex-col min-w-0">
         <header class="flex items-center justify-between px-6 py-4 lg:px-10 lg:py-5 glass-panel sticky top-0 z-50">
             <div class="flex items-center gap-4 lg:hidden">
