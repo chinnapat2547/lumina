@@ -122,7 +122,6 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] == 'upload_slip') {
             if (isset($_FILES['slip_image']) && $_FILES['slip_image']['error'] == 0) {
                 
-                // 🟢 แก้ที่ 2: ตรวจสอบนามสกุล, ชนิดไฟล์ และขนาดไฟล์สลิป 🟢
                 $allowed_ext = ['jpg', 'jpeg', 'png', 'webp'];
                 $allowed_mime = ['image/jpeg', 'image/png', 'image/webp'];
                 $max_size = 2 * 1024 * 1024; // 2MB
@@ -167,7 +166,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
     if ($should_save_order) {
         $orderNo = "ORD" . date('Ymd') . rand(1000, 9999);
         
-        // 🟢 แก้ที่ 3: ให้สถานะเป็น processing ทั้งหมด (COD ก็จะเป็น 'ที่ต้องจัดส่ง' ไม่ค้าง 'รอชำระ') 🟢
+        // 🟢 ให้สถานะเป็น processing ทั้งหมด (รวมถึง COD จะไปอยู่ใน 'ที่ต้องจัดส่ง')
         $status = 'processing';
         
         $pm = $checkoutData['payment_method'];
@@ -229,6 +228,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script id="tailwind-config">
     tailwind.config = {
@@ -361,23 +361,25 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             <h2 class="text-2xl font-bold text-primary mb-6">ยอดชำระ: ฿<?= number_format($netTotal, 2) ?></h2>
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
-                <div class="w-40 h-40 bg-white mx-auto rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center p-2 relative">
-                    <img src="qr.JPEG" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
-                    </div>
+                <div class="w-48 h-48 bg-white mx-auto rounded-3xl shadow-sm border border-gray-100 flex items-center justify-center p-2 relative overflow-hidden">
+                    <img src="../profile/qr.JPEG" alt="PromptPay QR" class="w-full h-full object-cover rounded-2xl">
                 </div>
 
                 <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm text-left h-full flex flex-col justify-center border border-gray-100 dark:border-gray-600">
                     <div class="flex items-center gap-2 mb-3">
-                        <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                            <span class="material-icons-round text-white text-sm">account_balance</span>
+                        <div class="w-8 h-8 rounded-full bg-pink-50 flex items-center justify-center">
+                            <span class="material-icons-round text-primary text-sm">account_balance</span>
                         </div>
                         <span class="font-bold text-gray-800 dark:text-white">ธนาคารกรุงเทพ</span>
                     </div>
                     <div class="flex justify-between items-center mb-1">
                         <span class="text-lg font-mono text-gray-700 dark:text-gray-300 font-bold tracking-widest">414-425-3830</span>
-                        <button type="button" class="text-primary hover:text-pink-600 transition-colors" onclick="navigator.clipboard.writeText('4144253830'); alert('คัดลอกเลขบัญชีแล้ว');"><span class="material-icons-round text-[20px]">content_copy</span></button>
+                        
+                        <button type="button" class="text-primary hover:text-pink-600 bg-pink-50 hover:bg-pink-100 p-1.5 rounded-lg transition-colors flex items-center justify-center" onclick="copyAccountNumber('4144253830')" title="คัดลอกเลขบัญชี">
+                            <span class="material-icons-round text-[20px]">content_copy</span>
+                        </button>
                     </div>
-                    <p class="text-xs text-gray-500">ชื่อบัญชี: บจก. ลูมิน่า บิวตี้</p>
+                    <p class="text-xs text-gray-500 mt-1">ชื่อบัญชี: บจก. ลูมิน่า บิวตี้</p>
                 </div>
             </div>
         </div>
@@ -406,7 +408,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         <div class="w-28 h-28 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border-[8px] border-green-50 dark:border-gray-700">
             <span class="material-icons-round text-6xl">check</span>
         </div>
-        <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-white mb-3 tracking-tight">ชำระเงินสำเร็จ!</h1>
+        <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 dark:text-white mb-3 tracking-tight">ชำระเงิน/ทำรายการสำเร็จ!</h1>
         <p class="text-gray-500 text-lg mb-8">ขอบคุณสำหรับการสั่งซื้อ หมายเลขออเดอร์ของคุณคือ <br><span class="font-bold text-primary text-xl tracking-wider mt-2 inline-block">#<?= $orderNo ?></span></p>
 
         <div class="bg-pink-50/50 dark:bg-gray-700/50 rounded-2xl p-6 mb-10 max-w-xs mx-auto border border-pink-100 dark:border-gray-600 shadow-inner">
@@ -462,7 +464,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
-    // ฟังก์ชันพรีวิวและตรวจสอบไฟล์สลิป
+    // 🟢 ฟังก์ชันพรีวิวและตรวจสอบไฟล์สลิปแบบเรียลไทม์ พร้อมแจ้งเตือน Pop-up 🟢
     function previewFileName(input) {
         const textSpan = document.getElementById('fileNameText');
         const uploadArea = input.closest('.upload-area');
@@ -473,7 +475,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             const fileType = file.type;
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
-            // 1. ตรวจสอบนามสกุล/ประเภทไฟล์
+            // ตรวจสอบนามสกุล/ประเภทไฟล์
             if (!validTypes.includes(fileType)) {
                 Swal.fire({
                     icon: 'error',
@@ -486,7 +488,7 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
                 return;
             }
 
-            // 2. ตรวจสอบขนาดไฟล์ (ไม่เกิน 2MB = 2097152 Bytes)
+            // ตรวจสอบขนาดไฟล์ (ไม่เกิน 2MB = 2097152 Bytes)
             if (fileSize > 2097152) {
                 Swal.fire({
                     icon: 'warning',
@@ -517,6 +519,27 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
         textSpan.classList.remove('text-primary');
         uploadArea.classList.remove('active', 'bg-pink-50/50', 'border-primary');
         uploadArea.classList.add('bg-white');
+    }
+
+    // 🟢 ฟังก์ชันคัดลอกเลขบัญชี (รองรับทุกเบราว์เซอร์ 100%) พร้อมแจ้งเตือน Pop-up สวยๆ 🟢
+    function copyAccountNumber(text) {
+        const tempInput = document.createElement("input");
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        tempInput.setSelectionRange(0, 99999);
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'คัดลอกเลขบัญชีเรียบร้อย',
+            showConfirmButton: false,
+            timer: 2000,
+            customClass: { popup: 'rounded-2xl' }
+        });
     }
 </script>
 </body></html>
