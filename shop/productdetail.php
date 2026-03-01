@@ -23,8 +23,12 @@ if (isset($_SESSION['u_id'])) {
         $resultUser = mysqli_stmt_get_result($stmtUser);
         if ($rowUser = mysqli_fetch_assoc($resultUser)) {
             $userData = $rowUser;
-            if (!empty($userData['u_image']) && file_exists("../profile/uploads" . $userData['u_image'])) {
-                $profileImage = "../uploads/" . $userData['u_image'];
+            
+            // ใช้ __DIR__ เจาะจง Path ไปที่โฟลเดอร์ profile/uploads/ ให้ชัวร์ 100%
+            $physical_path = __DIR__ . "/../profile/uploads/" . $userData['u_image'];
+            
+            if (!empty($userData['u_image']) && file_exists($physical_path)) {
+                $profileImage = "../profile/uploads/" . $userData['u_image'];
             } else {
                 $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=F43F85&color=fff";
             }
