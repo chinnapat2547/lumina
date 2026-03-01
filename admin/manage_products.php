@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
             // อัปโหลดรูปหน้าปก
             if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
                 $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
-                if (empty($ext)) $ext = 'jpg'; // กันเหนียวถ้านามสกุลหาย
+                if (empty($ext)) $ext = 'jpg'; 
                 $main_img_name = "prod_" . $product_id . "_main_" . time() . "." . $ext;
                 
                 if(move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)){
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
 }
 
 // ==========================================
-// 2. จัดการแก้ไขสินค้าเบื้องต้น (POST)
+// 2. จัดการแก้ไขสินค้า (POST) - 🟢 แก้ที่ 7: อัปเดต Gallery & สีได้
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'edit_product') {
     $p_id = (int)$_POST['edit_p_id'];
@@ -102,14 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     $stmt = mysqli_prepare($conn, $sql);
     
     if ($stmt) {
-        // แก้ไข binding ให้ตรงกับตัวแปร 7 ตัว (เพิ่ม i ตัวสุดท้าย)
         mysqli_stmt_bind_param($stmt, "ssidisi", $name, $sku, $cat_id, $price, $stock, $detail, $p_id);
         
         if (mysqli_stmt_execute($stmt)) {
             $upload_dir = "../uploads/products/";
             if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
 
-            // ถ้ามีการอัปโหลดรูปปกใหม่ ให้เปลี่ยนรูป
+            // อัปเดตรูปปก
             if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == 0) {
                 $ext = pathinfo($_FILES['main_image']['name'], PATHINFO_EXTENSION);
                 if (empty($ext)) $ext = 'jpg';
@@ -117,13 +116,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 
                 if (move_uploaded_file($_FILES['main_image']['tmp_name'], $upload_dir . $main_img_name)) {
                     mysqli_query($conn, "UPDATE product SET p_image = '$main_img_name' WHERE p_id = $p_id");
-                } else {
-                    $_SESSION['error_msg'] = "อัปเดตข้อมูลสำเร็จ แต่ไม่สามารถบันทึกรูปใหม่ได้";
+                }
+            }
+
+            // จัดการลบรูป Gallery เดิมที่ถูกกดลบ
+            if (isset($_POST['deleted_galleries'])) {
+                foreach ($_POST['deleted_galleries'] as $del_gid) {
+                    $del_gid = (int)$del_gid;
+                    $resDel = mysqli_query($conn, "SELECT image_url FROM product_images WHERE img_id = $del_gid");
+                    if ($rDel = mysqli_fetch_assoc($resDel)) {
+                        @unlink($upload_dir . $rDel['image_url']);
+                        mysqli_query($conn, "DELETE FROM product_images WHERE img_id = $del_gid");
+                    }
+                }
+            }
+
+            // เพิ่มรูป Gallery ใหม่
+            if (isset($_FILES['edit_gallery_images'])) {
+                foreach ($_FILES['edit_gallery_images']['tmp_name'] as $key => $tmp_name) {
+                    if ($_FILES['edit_gallery_images']['error'][$key] == 0) {
+                        $ext = pathinfo($_FILES['edit_gallery_images']['name'][$key], PATHINFO_EXTENSION);
+                        if (empty($ext)) $ext = 'jpg';
+                        $gall_img_name = "prod_" . $p_id . "_gall_" . time() . "_" . $key . "." . $ext;
+                        if (move_uploaded_file($tmp_name, $upload_dir . $gall_img_name)) {
+                            mysqli_query($conn, "INSERT INTO product_images (p_id, image_url) VALUES ($p_id, '$gall_img_name')");
+                        }
+                    }
+                }
+            }
+
+            // จัดการสี: ลบของเดิมทิ้งและแอดใหม่ทั้งหมดเพื่อความง่าย
+            mysqli_query($conn, "DELETE FROM product_colors WHERE p_id = $p_id");
+            if (isset($_POST['edit_color_names']) && isset($_POST['edit_color_hexes'])) {
+                $c_names = $_POST['edit_color_names'];
+                $c_hexes = $_POST['edit_color_hexes'];
+                for ($i = 0; $i < count($c_names); $i++) {
+                    if (!empty(trim($c_names[$i]))) {
+                        $c_name = mysqli_real_escape_string($conn, trim($c_names[$i]));
+                        $c_hex = mysqli_real_escape_string($conn, trim($c_hexes[$i]));
+                        mysqli_query($conn, "INSERT INTO product_colors (p_id, color_name, color_hex) VALUES ($p_id, '$c_name', '$c_hex')");
+                    }
                 }
             }
 
             if(!isset($_SESSION['error_msg'])) {
-                $_SESSION['success_msg'] = "แก้ไขข้อมูลสินค้าสำเร็จ!";
+                $_SESSION['success_msg'] = "แก้ไขข้อมูลสินค้าและอัปเดตรูปภาพ/สีสำเร็จ!";
             }
         } else {
             $_SESSION['error_msg'] = "SQL Error (Execute): " . mysqli_stmt_error($stmt);
@@ -164,18 +201,49 @@ if(isset($_GET['delete'])) {
     exit();
 }
 
-// สถิติ
+// ==========================================
+// 5. ข้อมูลสถิติ & Pagination & ค้นหา 🟢 แก้ที่ 1 & 3
+// ==========================================
 $stat_total = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product"))['c'];
 $stat_out = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock = 0"))['c'];
 $stat_low = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM product WHERE p_stock > 0 AND p_stock <= 10"))['c'];
 
-// โชว์แจ้งเตือนออเดอร์ (Sidebar)
 $countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
 
-// ดึงสินค้า
+$search = trim($_GET['search'] ?? '');
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$limit = 10;
+$offset = ($page - 1) * $limit;
+
+$whereClause = "";
+if ($search !== '') {
+    $searchEsc = mysqli_real_escape_string($conn, $search);
+    $whereClause = "WHERE p.p_name LIKE '%$searchEsc%' OR p.p_sku LIKE '%$searchEsc%' OR c.c_name LIKE '%$searchEsc%'";
+}
+
+$sqlCount = "SELECT COUNT(*) as total FROM product p LEFT JOIN category c ON p.c_id = c.c_id $whereClause";
+$totalProducts = mysqli_fetch_assoc(mysqli_query($conn, $sqlCount))['total'];
+$totalPages = ceil($totalProducts / $limit);
+
 $products = [];
-$resProd = mysqli_query($conn, "SELECT p.*, c.c_name FROM product p LEFT JOIN category c ON p.c_id = c.c_id ORDER BY p.p_id DESC");
-while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
+$sqlProd = "SELECT p.*, c.c_name FROM product p LEFT JOIN category c ON p.c_id = c.c_id $whereClause ORDER BY p.p_id DESC LIMIT $limit OFFSET $offset";
+$resProd = mysqli_query($conn, $sqlProd);
+while($p = mysqli_fetch_assoc($resProd)) { 
+    // ดึง Gallery ของแต่ละสินค้าเตรียมไว้สำหรับปุ่ม Edit
+    $gals = [];
+    $resG = mysqli_query($conn, "SELECT * FROM product_images WHERE p_id = " . $p['p_id']);
+    while($g = mysqli_fetch_assoc($resG)) { $gals[] = $g; }
+    $p['galleries'] = $gals;
+
+    // ดึง Colors
+    $cols = [];
+    $resC = mysqli_query($conn, "SELECT * FROM product_colors WHERE p_id = " . $p['p_id']);
+    while($cl = mysqli_fetch_assoc($resC)) { $cols[] = $cl; }
+    $p['colors'] = $cols;
+
+    $products[] = $p; 
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -227,7 +295,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-thumb { background: #FBCFE8; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #ec2d88; }
-    /* Scrollbar Modal สี */
     .color-scroll::-webkit-scrollbar { width: 4px; }
     .color-scroll::-webkit-scrollbar-thumb { background: #fce7f3; border-radius: 4px; }
 </style>
@@ -252,11 +319,13 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     <span class="material-icons-round">inventory_2</span>
                     <span class="font-bold text-[15px]">จัดการสินค้า</span>
                 </a>
-                <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_orders.php">
-                    <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
-                    <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
+                <a class="nav-item flex items-center justify-between px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_orders.php">
+                    <div class="flex items-center gap-4">
+                        <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
+                        <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
+                    </div>
                     <?php if($countPending > 0): ?>
-                        <span class="ml-auto bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $countPending ?></span>
+                        <span class="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $countPending ?></span>
                     <?php endif; ?>
                 </a>
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted transition-all duration-300 group hover:pl-6" href="manage_customers.php">
@@ -290,62 +359,24 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <span class="font-bold text-xl text-primary flex items-center gap-1"><span class="material-icons-round">spa</span> Lumina</span>
             </div>
             
-            <div class="hidden md:flex flex-1 max-w-md relative group">
+            <form method="GET" action="" class="hidden md:flex flex-1 max-w-md relative group">
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <span class="material-icons-round text-gray-400 group-focus-within:text-primary transition-colors text-[20px]">search</span>
                 </div>
-                <input class="block w-full pl-12 pr-4 py-2.5 rounded-full border border-pink-100 bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 transition-all outline-none" placeholder="ค้นหาสินค้า (ชื่อ, รหัส, หมวดหมู่)..." type="text"/>
-            </div>
+                <input name="search" value="<?= htmlspecialchars($search) ?>" class="block w-full pl-12 pr-4 py-2.5 rounded-full border border-pink-100 bg-white shadow-sm text-sm placeholder-gray-400 focus:ring-2 focus:ring-primary/20 transition-all outline-none" placeholder="ค้นหาสินค้า (ชื่อ, รหัส, หมวดหมู่)..." type="text"/>
+                <button type="submit" class="hidden"></button> </form>
             
             <div class="flex items-center gap-4 lg:gap-6 ml-auto">
-                <button class="relative p-2.5 rounded-full bg-white text-gray-500 hover:text-primary hover:bg-pink-50 transition-colors shadow-sm border border-pink-50">
-                    <span class="material-icons-round text-[22px]">notifications</span>
-                    <?= $countPending > 0 ? '<span class="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>' : '' ?>
-                </button>
-                
                 <div class="relative group flex items-center">
                     <?php 
                         $adminName = $_SESSION['admin_username'] ?? 'Admin'; 
                         $adminAvatar = "https://ui-avatars.com/api/?name=" . urlencode($adminName) . "&background=a855f7&color=fff";
                     ?>
                     <a href="#" class="block w-11 h-11 rounded-full bg-gradient-to-tr from-purple-400 to-indigo-400 p-[2px] shadow-sm hover:shadow-glow hover:scale-105 transition-all cursor-pointer">
-                        <div class="bg-white rounded-full p-[2px] w-full h-full">
+                        <div class="bg-white rounded-full p-[2px] w-full h-full overflow-hidden">
                             <img alt="Admin Profile" class="w-full h-full rounded-full object-cover" src="<?= $adminAvatar ?>"/>
                         </div>
                     </a>
-                    
-                    <div class="absolute right-0 hidden pt-4 top-full w-[300px] z-50 group-hover:block cursor-default">
-                        <div class="bg-white rounded-3xl shadow-soft border border-pink-100 overflow-hidden p-5 relative">
-                            
-                            <div class="text-center mb-4">
-                                <span class="text-sm font-bold text-purple-500 bg-purple-50 px-3 py-1 rounded-full">
-                                    Administrator Mode
-                                </span>
-                            </div>
-
-                            <div class="flex justify-center relative mb-3">
-                                <div class="rounded-full p-[3px] bg-purple-500 shadow-md">
-                                    <div class="bg-white rounded-full p-[2px] w-16 h-16">
-                                        <img src="<?= $adminAvatar ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="text-center mb-6">
-                                <h3 class="text-[20px] font-bold text-gray-800">สวัสดี, คุณ <?= htmlspecialchars($adminName) ?></h3>
-                                <p class="text-xs text-gray-500 mt-1">ผู้จัดการระบบสูงสุด</p>
-                            </div>
-
-                            <div class="flex flex-col gap-3">
-                                <a href="settings.php" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-purple-500">
-                                    <span class="material-icons-round text-[18px]">manage_accounts</span> จัดการบัญชี
-                                </a>
-                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[14px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[18px]">logout</span> ออกจากระบบ
-                                </a>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </header>
@@ -401,13 +432,13 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 </div>
             </div>
 
-            <div class="bg-white rounded-3xl shadow-card overflow-hidden border border-gray-100 mb-10">
+            <div class="bg-white rounded-3xl shadow-card overflow-hidden border border-gray-100">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr class="bg-gray-50/80 text-gray-500 text-[13px] uppercase tracking-wider border-b border-gray-100">
+                            <tr class="bg-gray-50/80 text-gray-500 text-sm uppercase tracking-wider border-b border-gray-100">
                                 <th class="px-6 py-5 font-bold pl-8">รูปภาพ</th>
-                                <th class="px-6 py-5 font-bold">ชื่อสินค้า / SKU</th>
+                                <th class="px-6 py-5 font-bold w-1/3">ชื่อสินค้า / SKU</th>
                                 <th class="px-6 py-5 font-bold">หมวดหมู่</th>
                                 <th class="px-6 py-5 font-bold">ราคา</th>
                                 <th class="px-6 py-5 font-bold text-center">สต็อก</th>
@@ -415,64 +446,79 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                                 <th class="px-6 py-5 font-bold text-right pr-8">จัดการ</th>
                             </tr>
                         </thead>
-                        <tbody class="text-sm divide-y divide-gray-50">
+                        <tbody class="divide-y divide-gray-50">
+                            <?php if (empty($products)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center py-10 text-gray-500">ไม่พบสินค้าที่คุณค้นหา</td>
+                            </tr>
+                            <?php endif; ?>
+                            
                             <?php foreach($products as $p): 
                                 $img = (!empty($p['p_image']) && file_exists("../uploads/products/".$p['p_image'])) 
                                     ? "../uploads/products/".$p['p_image'] 
-                                    : "https://placehold.co/150x150/fce7f3/ec2d88?text=No+Image"; // เปลี่ยน Fallback เผื่อ placeholder เดิมเสีย
+                                    : "https://placehold.co/150x150/fce7f3/ec2d88?text=No+Image";
                             ?>
                             <tr class="hover:bg-pink-50/30 transition-colors group">
                                 <td class="px-6 py-4 pl-8">
-                                    <div class="w-16 h-16 rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+                                    <div class="w-24 h-24 rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm bg-white">
                                         <img src="<?= $img ?>" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex flex-col">
-                                        <span class="font-bold text-gray-800 text-base mb-0.5 group-hover:text-primary transition-colors line-clamp-2"><?= htmlspecialchars($p['p_name']) ?></span>
-                                        <span class="text-[12px] text-gray-400 font-mono bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">SKU: <?= htmlspecialchars($p['p_sku'] ?: '-') ?></span>
+                                        <span class="font-extrabold text-gray-800 text-lg mb-1 group-hover:text-primary transition-colors line-clamp-2"><?= htmlspecialchars($p['p_name']) ?></span>
+                                        <span class="text-sm text-gray-400 font-mono bg-gray-50 w-fit px-2 py-0.5 rounded-md border border-gray-100">SKU: <?= htmlspecialchars($p['p_sku'] ?: '-') ?></span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-pink-50 text-primary border border-pink-100 shadow-sm">
-                                        <?= htmlspecialchars($p['c_name'] ?? 'ไม่มีหมวดหมู่') ?>
+                                    <span class="inline-flex px-4 py-1.5 rounded-2xl text-xs font-bold bg-pink-50 text-primary border border-pink-100 shadow-sm text-center leading-relaxed">
+                                        <?= preg_replace('/ ?\(/', '<br>(', htmlspecialchars($p['c_name'] ?? 'ไม่มีหมวดหมู่')) ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 font-bold text-gray-800 text-base">฿<?= number_format($p['p_price'], 2) ?></td>
+                                <td class="px-6 py-4 font-black text-primary text-xl">฿<?= number_format($p['p_price'], 2) ?></td>
+                                
                                 <td class="px-6 py-4 text-center">
-                                    <?php if($p['p_stock'] == 0): ?>
-                                        <span class="font-bold text-red-500 bg-red-50 px-3 py-1 rounded-lg text-xs shadow-sm">สินค้าหมด</span>
-                                    <?php elseif($p['p_stock'] <= 10): ?>
-                                        <span class="font-bold text-yellow-600 bg-yellow-50 px-3 py-1 rounded-lg text-xs shadow-sm">เหลือ <?= $p['p_stock'] ?></span>
-                                    <?php else: ?>
-                                        <span class="font-bold text-green-600 bg-green-50 px-3 py-1 rounded-lg text-xs shadow-sm">พร้อมขาย (<?= $p['p_stock'] ?>)</span>
-                                    <?php endif; ?>
+                                    <span class="text-2xl font-extrabold <?= $p['p_stock'] <= 10 ? 'text-red-500' : 'text-gray-800' ?>"><?= $p['p_stock'] ?></span>
                                 </td>
                                 
                                 <td class="px-6 py-4 text-center">
                                     <label class="relative inline-flex items-center cursor-pointer justify-center">
                                         <input type="checkbox" class="sr-only peer" onchange="window.location.href='?toggle_status=<?= $p['status'] ?>&id=<?= $p['p_id'] ?>'" <?= $p['status'] ? 'checked' : '' ?>>
-                                        <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        <div class="w-14 h-7 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
                                     </label>
                                 </td>
                                 
-                                <td class="px-6 py-4 text-right pr-8">
-                                    <button 
-                                        data-product="<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>"
-                                        data-img="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8') ?>"
-                                        onclick="openEditModal(this)" 
-                                        class="w-9 h-9 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors inline-flex items-center justify-center mr-1 shadow-sm border border-gray-100">
-                                        <span class="material-icons-round text-[20px]">edit</span>
-                                    </button>
-                                    <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="w-9 h-9 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex items-center justify-center shadow-sm border border-gray-100">
-                                        <span class="material-icons-round text-[20px]">delete</span>
-                                    </button>
+                                <td class="px-6 py-4 pr-8">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button 
+                                            data-product="<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>"
+                                            data-img="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8') ?>"
+                                            onclick="openEditModal(this)" 
+                                            class="w-11 h-11 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors flex items-center justify-center shadow-sm border border-gray-100">
+                                            <span class="material-icons-round text-[24px]">edit</span>
+                                        </button>
+                                        <button onclick="confirmDelete(<?= $p['p_id'] ?>)" class="w-11 h-11 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center shadow-sm border border-gray-100">
+                                            <span class="material-icons-round text-[24px]">delete</span>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
+
+                <?php if ($totalPages > 1): ?>
+                <div class="p-6 border-t border-gray-100 flex items-center justify-center gap-2">
+                    <?php 
+                    $qs = $search !== '' ? "&search=" . urlencode($search) : "";
+                    for ($i = 1; $i <= $totalPages; $i++): 
+                    ?>
+                        <a href="?page=<?= $i ?><?= $qs ?>" class="w-10 h-10 flex items-center justify-center rounded-xl font-bold transition-all <?= $i === $page ? 'bg-primary text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-pink-100 hover:text-primary' ?>">
+                            <?= $i ?>
+                        </a>
+                    <?php endfor; ?> </div>
+                <?php endif; ?>
             </div>
         </div>
     </main>
@@ -482,9 +528,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     <div class="bg-white rounded-[2rem] w-full max-w-5xl h-full max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300 border border-white">
         
         <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <div>
-                <h2 class="text-2xl font-extrabold text-gray-800">เพิ่มสินค้าใหม่</h2>
-            </div>
+            <div><h2 class="text-2xl font-extrabold text-gray-800">เพิ่มสินค้าใหม่</h2></div>
             <button type="button" onclick="closeModal('addProductModal')" class="w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-colors shadow-sm">
                 <span class="material-icons-round text-[20px]">close</span>
             </button>
@@ -514,9 +558,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                 <div class="mt-6">
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-xs font-bold text-gray-500">รูปภาพเพิ่มเติม (Gallery)</label>
-                        <span class="text-[10px] text-primary bg-white px-2 py-1 border border-pink-100 rounded-full font-bold shadow-sm">อัปโหลดได้ไม่เกิน 8 MB</span>
                     </div>
-                    
                     <div class="grid grid-cols-3 gap-3" id="galleryPreviewContainer">
                         <label id="addGalleryBtn" class="aspect-square border-2 border-dashed border-pink-300 rounded-2xl bg-white flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:text-primary transition-all text-primary/60 hover:bg-pink-50 shadow-sm">
                             <span class="material-icons-round text-3xl">add_photo_alternate</span>
@@ -571,7 +613,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     <div class="pt-5 border-t border-gray-100">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg"><span class="material-icons-round text-purple-500 bg-purple-50 p-1.5 rounded-xl shadow-sm">palette</span> ตัวเลือกสี</h3>
-                            <button type="button" onclick="addColorRow()" class="text-xs bg-white border border-purple-200 text-purple-600 font-bold px-4 py-2 rounded-full hover:bg-purple-50 hover:border-purple-300 flex items-center gap-1 transition-all shadow-sm">
+                            <button type="button" onclick="addColorRow('colorContainer')" class="text-xs bg-white border border-purple-200 text-purple-600 font-bold px-4 py-2 rounded-full hover:bg-purple-50 hover:border-purple-300 flex items-center gap-1 transition-all shadow-sm">
                                 <span class="material-icons-round text-[16px]">add</span> เพิ่มสี
                             </button>
                         </div>
@@ -589,7 +631,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
 </div>
 
 <div id="editProductModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center opacity-0 transition-opacity duration-300 py-10">
-    <div class="bg-white rounded-[2rem] w-full max-w-4xl h-auto max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300 border border-white">
+    <div class="bg-white rounded-[2rem] w-full max-w-5xl h-full max-h-[90vh] shadow-2xl flex flex-col overflow-hidden modal-content transform scale-95 transition-transform duration-300 border border-white">
         
         <div class="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <h2 class="text-2xl font-extrabold text-gray-800 flex items-center gap-2"><span class="material-icons-round text-blue-500">edit_note</span> แก้ไขข้อมูลสินค้า</h2>
@@ -598,19 +640,20 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
             </button>
         </div>
 
-        <form action="" method="POST" enctype="multipart/form-data" class="flex-1 overflow-y-auto p-8 color-scroll pb-28 bg-white">
+        <form action="" method="POST" enctype="multipart/form-data" class="flex-1 overflow-hidden flex flex-col md:flex-row">
             <input type="hidden" name="action" value="edit_product">
             <input type="hidden" name="edit_p_id" id="edit_p_id">
-            
-            <div class="flex flex-col md:flex-row gap-8">
-                <div class="w-full md:w-1/3">
-                    <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">เปลี่ยนรูปปก (ไม่บังคับ)</label>
-                    <div class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-3xl bg-gray-50 flex flex-col items-center justify-center relative hover:border-primary transition-colors cursor-pointer overflow-hidden group shadow-sm">
+            <div id="deletedGalleriesInput"></div> <div class="w-full md:w-2/5 p-8 border-r border-gray-100 bg-blue-50/30 overflow-y-auto color-scroll">
+                <h3 class="font-bold text-gray-800 mb-5 flex items-center gap-2 text-lg"><span class="material-icons-round text-blue-500 bg-white p-1.5 rounded-xl shadow-sm">collections</span> รูปภาพสินค้า</h3>
+                
+                <div class="mb-6">
+                    <label class="block text-xs font-bold text-gray-500 mb-2">เปลี่ยนรูปปก (ไม่บังคับ)</label>
+                    <div class="w-full aspect-square border-2 border-dashed border-gray-300 rounded-3xl bg-white flex flex-col items-center justify-center relative hover:border-blue-500 transition-colors cursor-pointer overflow-hidden group shadow-sm">
                         <input type="file" name="main_image" id="editMainImageInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="previewEditMainImage(this)">
                         <img id="editImagePreview" src="" class="absolute inset-0 w-full h-full object-cover hidden z-0">
                         <div id="editImagePlaceholder" class="text-center group-hover:scale-110 transition-transform">
-                            <div class="w-14 h-14 bg-white text-gray-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm border border-gray-100"><span class="material-icons-round text-2xl">upload</span></div>
-                            <span class="text-xs font-bold text-gray-500">คลิกอัปโหลดรูปใหม่</span>
+                            <div class="w-14 h-14 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm border border-gray-100"><span class="material-icons-round text-2xl">upload</span></div>
+                            <span class="text-xs font-bold text-gray-500">คลิกเปลี่ยนรูปปก</span>
                         </div>
                         <button type="button" id="removeEditImageBtn" onclick="removeEditMainImage(event)" class="hidden absolute top-3 right-3 z-20 w-9 h-9 bg-white/90 backdrop-blur-sm text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-md">
                             <span class="material-icons-round text-[18px]">close</span>
@@ -618,19 +661,36 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                     </div>
                 </div>
 
-                <div class="w-full md:w-2/3 space-y-5">
+                <div class="mt-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-gray-500">รูปภาพเพิ่มเติม (Gallery)</label>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3" id="editGalleryPreviewContainer">
+                        <label id="addEditGalleryBtn" class="aspect-square border-2 border-dashed border-gray-300 rounded-2xl bg-white flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:text-blue-500 transition-all text-gray-400 hover:bg-blue-50 shadow-sm order-last">
+                            <span class="material-icons-round text-3xl">add_photo_alternate</span>
+                            <span class="text-[10px] font-bold mt-1">เพิ่มรูปใหม่</span>
+                            <input type="file" multiple accept="image/*" class="hidden" id="editGalleryInput">
+                        </label>
+                        <input type="file" name="edit_gallery_images[]" multiple class="hidden" id="realEditGalleryInput">
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full md:w-3/5 p-8 overflow-y-auto color-scroll pb-24 relative bg-white">
+                <h3 class="font-bold text-gray-800 mb-5 flex items-center gap-2 text-lg"><span class="material-icons-round text-blue-500 bg-blue-50 p-1.5 rounded-xl shadow-sm">description</span> รายละเอียดทั่วไป</h3>
+                <div class="space-y-5">
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ชื่อสินค้า</label>
-                        <input type="text" name="p_name" id="edit_p_name" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all shadow-sm">
+                        <input type="text" name="p_name" id="edit_p_name" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/30 outline-none transition-all shadow-sm">
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">รหัสสินค้า</label>
-                            <input type="text" name="p_sku" id="edit_p_sku" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-mono text-sm shadow-sm">
+                            <input type="text" name="p_sku" id="edit_p_sku" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/30 outline-none transition-all font-mono text-sm shadow-sm">
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">หมวดหมู่</label>
-                            <select name="c_id" id="edit_c_id" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all appearance-none shadow-sm cursor-pointer">
+                            <select name="c_id" id="edit_c_id" required class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/30 outline-none transition-all appearance-none shadow-sm cursor-pointer">
                                 <?php foreach($categories as $c): ?>
                                     <option value="<?= $c['c_id'] ?>"><?= $c['c_name'] ?></option>
                                 <?php endforeach; ?>
@@ -642,17 +702,27 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">ราคา (บาท)</label>
                             <div class="relative">
                                 <span class="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
-                                <input type="number" name="p_price" id="edit_p_price" required min="0" class="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all font-bold text-primary shadow-sm">
+                                <input type="number" name="p_price" id="edit_p_price" required min="0" class="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/30 outline-none transition-all font-bold text-blue-600 shadow-sm">
                             </div>
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">สต็อก</label>
-                            <input type="number" name="p_stock" id="edit_p_stock" required min="0" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all shadow-sm">
+                            <input type="number" name="p_stock" id="edit_p_stock" required min="0" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/30 outline-none transition-all shadow-sm">
                         </div>
                     </div>
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1.5 ml-1">รายละเอียด</label>
-                        <textarea name="p_detail" id="edit_p_detail" rows="4" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/30 outline-none transition-all resize-none shadow-sm"></textarea>
+                        <textarea name="p_detail" id="edit_p_detail" rows="4" class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/30 outline-none transition-all resize-none shadow-sm"></textarea>
+                    </div>
+
+                    <div class="pt-5 border-t border-gray-100">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-gray-800 flex items-center gap-2 text-lg"><span class="material-icons-round text-purple-500 bg-purple-50 p-1.5 rounded-xl shadow-sm">palette</span> ตัวเลือกสี</h3>
+                            <button type="button" onclick="addColorRow('editColorContainer')" class="text-xs bg-white border border-purple-200 text-purple-600 font-bold px-4 py-2 rounded-full hover:bg-purple-50 hover:border-purple-300 flex items-center gap-1 transition-all shadow-sm">
+                                <span class="material-icons-round text-[16px]">add</span> เพิ่มสี
+                            </button>
+                        </div>
+                        <div id="editColorContainer" class="space-y-3"></div>
                     </div>
                 </div>
             </div>
@@ -676,9 +746,8 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         setTimeout(() => m.classList.add('hidden'), 300);
     }
 
-    // 🟢 เปลี่ยนวิธีส่งข้อมูลให้ Modal Edit ผ่าน Dataset เพื่อป้องกัน JS Error จากเครื่องหมายคำพูด 🟢
+    // 🟢 แก้ที่ 7: ฟังก์ชันเปิด Modal แก้ไข (ดึงข้อมูล Gallery และ Color มาแสดงด้วย)
     function openEditModal(btnElement) {
-        // แปลงข้อมูล JSON ที่แนบมากับปุ่มกลับเป็น Object
         const p = JSON.parse(btnElement.dataset.product);
         const imgUrl = btnElement.dataset.img;
 
@@ -690,6 +759,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         document.getElementById('edit_p_stock').value = p.p_stock;
         document.getElementById('edit_p_detail').value = p.p_detail || '';
         
+        // รูปปก
         document.getElementById('editMainImageInput').value = ''; 
         if (imgUrl && !imgUrl.includes('placeholder')) {
             document.getElementById('editImagePreview').src = imgUrl;
@@ -702,11 +772,58 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
             document.getElementById('removeEditImageBtn').classList.add('hidden');
         }
 
+        // จัดการล้างค่า Gallery เดิม
+        document.getElementById('deletedGalleriesInput').innerHTML = '';
+        const gContainer = document.getElementById('editGalleryPreviewContainer');
+        gContainer.querySelectorAll('.existing-gallery-item, .new-gallery-item').forEach(el => el.remove());
+        editGalleryDataTransfer = new DataTransfer();
+        if (document.getElementById('realEditGalleryInput')) document.getElementById('realEditGalleryInput').files = editGalleryDataTransfer.files;
+
+        // ดึง Gallery เก่ามาโชว์
+        if (p.galleries && p.galleries.length > 0) {
+            const addBtn = document.getElementById('addEditGalleryBtn');
+            p.galleries.forEach(g => {
+                const div = document.createElement('div');
+                div.className = 'existing-gallery-item aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group bg-white';
+                div.innerHTML = `
+                    <img src="../uploads/products/${g.image_url}" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                        <button type="button" onclick="markGalleryForDeletion(${g.img_id}, this)" class="w-9 h-9 bg-white text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors transform hover:scale-110 shadow-md">
+                            <span class="material-icons-round text-[18px]">delete</span>
+                        </button>
+                    </div>
+                `;
+                gContainer.insertBefore(div, addBtn);
+            });
+        }
+
+        // จัดการสี: ดึงสีเก่ามาโชว์
+        const cContainer = document.getElementById('editColorContainer');
+        cContainer.innerHTML = '';
+        if (p.colors && p.colors.length > 0) {
+            p.colors.forEach(c => {
+                addColorRowWithData('editColorContainer', c.color_hex, c.color_name, 'edit');
+            });
+        } else {
+            addColorRow('editColorContainer', 'edit'); // ใส่ช่องว่างไว้ 1 อัน
+        }
+
         openModal('editProductModal');
     }
 
+    // ฟังก์ชันมาร์ครูป Gallery เก่าว่าจะลบทิ้ง
+    function markGalleryForDeletion(img_id, btnElement) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'deleted_galleries[]';
+        input.value = img_id;
+        document.getElementById('deletedGalleriesInput').appendChild(input);
+        
+        btnElement.closest('.existing-gallery-item').remove(); // ลบออกจากจอ
+    }
+
     function removeEditMainImage(event) {
-        event.preventDefault();
+        event.preventDefault(); 
         document.getElementById('editMainImageInput').value = ''; 
         document.getElementById('editImagePreview').src = '';
         document.getElementById('editImagePreview').classList.add('hidden');
@@ -738,7 +855,6 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         });
     }
 
-    // 🟢 ระบบแจ้งเตือน 🟢
     <?php if (isset($_SESSION['success_msg'])): ?>
         Swal.fire({ icon: 'success', title: 'สำเร็จ!', text: '<?= $_SESSION['success_msg'] ?>', confirmButtonColor: '#ec2d88', customClass: { popup: 'rounded-3xl' }});
         <?php unset($_SESSION['success_msg']); ?>
@@ -749,6 +865,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
+    // ฟังก์ชันภาพหลัก (Add Modal)
     function previewMainImage(input) {
         if (input.files && input.files[0]) {
             let reader = new FileReader();
@@ -771,7 +888,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         document.getElementById('removeMainImageBtn').classList.add('hidden');
     }
 
-    // จัดการ Gallery อัปโหลดหลายรูปไม่ค้าง 100%
+    // 🟢 จัดการ Gallery ฝั่ง Add Product 🟢
     let galleryDataTransfer = new DataTransfer(); 
     const galleryInput = document.getElementById('galleryInput');
     const realGalleryInput = document.getElementById('realGalleryInput');
@@ -782,9 +899,7 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
         galleryInput.addEventListener('change', function(e) {
             const files = e.target.files;
             if (files.length > 0) {
-                for (let i = 0; i < files.length; i++) {
-                    galleryDataTransfer.items.add(files[i]);
-                }
+                for (let i = 0; i < files.length; i++) galleryDataTransfer.items.add(files[i]);
                 refreshGalleryUI();
             }
             this.value = ''; 
@@ -794,11 +909,8 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     function refreshGalleryUI() {
         container.querySelectorAll('.gallery-preview-item').forEach(el => el.remove());
         const files = galleryDataTransfer.files;
-        
         for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const objectUrl = URL.createObjectURL(file);
-            
+            const objectUrl = URL.createObjectURL(files[i]);
             const div = document.createElement('div');
             div.className = 'gallery-preview-item aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative group bg-white';
             div.innerHTML = `
@@ -817,29 +929,80 @@ while($p = mysqli_fetch_assoc($resProd)) { $products[] = $p; }
     window.removeGalleryImage = function(indexToRemove) {
         const newDt = new DataTransfer();
         const files = galleryDataTransfer.files;
-        for (let i = 0; i < files.length; i++) {
-            if (i !== indexToRemove) newDt.items.add(files[i]);
-        }
+        for (let i = 0; i < files.length; i++) { if (i !== indexToRemove) newDt.items.add(files[i]); }
         galleryDataTransfer = newDt;
         refreshGalleryUI();
     }
 
-    let colorIndex = 1;
-    function addColorRow() {
-        const colorContainer = document.getElementById('colorContainer');
+    // 🟢 จัดการ Gallery ฝั่ง Edit Product 🟢
+    let editGalleryDataTransfer = new DataTransfer(); 
+    const editGalleryInput = document.getElementById('editGalleryInput');
+    const realEditGalleryInput = document.getElementById('realEditGalleryInput');
+    const editContainer = document.getElementById('editGalleryPreviewContainer');
+    const editAddBtn = document.getElementById('addEditGalleryBtn');
+
+    if (editGalleryInput) {
+        editGalleryInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                for (let i = 0; i < files.length; i++) editGalleryDataTransfer.items.add(files[i]);
+                refreshEditGalleryUI();
+            }
+            this.value = ''; 
+        });
+    }
+
+    function refreshEditGalleryUI() {
+        editContainer.querySelectorAll('.new-gallery-item').forEach(el => el.remove());
+        const files = editGalleryDataTransfer.files;
+        for (let i = 0; i < files.length; i++) {
+            const objectUrl = URL.createObjectURL(files[i]);
+            const div = document.createElement('div');
+            div.className = 'new-gallery-item aspect-square rounded-2xl overflow-hidden border border-blue-200 shadow-sm relative group bg-white';
+            div.innerHTML = `
+                <img src="${objectUrl}" class="w-full h-full object-cover" onload="URL.revokeObjectURL(this.src)">
+                <div class="absolute top-1 left-1 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg z-10">ใหม่</div>
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px] z-20">
+                    <button type="button" onclick="removeEditGalleryImage(${i})" class="w-9 h-9 bg-white text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors transform hover:scale-110 shadow-md">
+                        <span class="material-icons-round text-[18px]">delete</span>
+                    </button>
+                </div>
+            `;
+            editContainer.insertBefore(div, editAddBtn);
+        }
+        if (realEditGalleryInput) realEditGalleryInput.files = editGalleryDataTransfer.files;
+    }
+
+    window.removeEditGalleryImage = function(indexToRemove) {
+        const newDt = new DataTransfer();
+        const files = editGalleryDataTransfer.files;
+        for (let i = 0; i < files.length; i++) { if (i !== indexToRemove) newDt.items.add(files[i]); }
+        editGalleryDataTransfer = newDt;
+        refreshEditGalleryUI();
+    }
+
+    // 🟢 จัดการเพิ่มช่องใส่สี 🟢
+    function addColorRow(containerId, prefix = '') {
+        addColorRowWithData(containerId, '#ec2d88', '', prefix);
+    }
+    
+    function addColorRowWithData(containerId, hex, name, prefix = '') {
+        const colorContainer = document.getElementById(containerId);
         const row = document.createElement('div');
+        const namePrefix = prefix === 'edit' ? 'edit_' : '';
+        
         row.className = 'flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-purple-300 transition-colors';
         row.innerHTML = `
-            <input type="color" name="color_hexes[]" value="#ec2d88" class="w-12 h-12 rounded-xl cursor-pointer border-0 p-0 bg-transparent flex-shrink-0 shadow-sm">
-            <input type="text" name="color_names[]" placeholder="ชื่อสี เช่น #01 W -'Bout to slay" class="flex-1 bg-transparent border-none text-sm focus:ring-0 outline-none p-0 text-gray-700 font-medium ml-2">
+            <input type="color" name="${namePrefix}color_hexes[]" value="${hex}" class="w-12 h-12 rounded-xl cursor-pointer border-0 p-0 bg-transparent flex-shrink-0 shadow-sm">
+            <input type="text" name="${namePrefix}color_names[]" value="${name}" placeholder="ชื่อสี เช่น #01 W -'Bout to slay" class="flex-1 bg-transparent border-none text-sm focus:ring-0 outline-none p-0 text-gray-700 font-medium ml-2">
             <button type="button" onclick="this.parentElement.remove()" class="w-9 h-9 rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors flex-shrink-0 mr-1">
                 <span class="material-icons-round text-[18px]">close</span>
             </button>
         `;
         colorContainer.appendChild(row);
-        colorIndex++;
     }
-    document.addEventListener("DOMContentLoaded", addColorRow);
+    
+    document.addEventListener("DOMContentLoaded", () => addColorRow('colorContainer'));
 </script>
 </body>
 </html>
