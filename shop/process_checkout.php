@@ -362,7 +362,6 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                 <div class="w-40 h-40 bg-white mx-auto rounded-2xl shadow-sm border border-gray-200 flex items-center justify-center p-2 relative">
-                    <img src="qr.JPEG" alt="PromptPay QR" class="w-full h-full object-contain opacity-80">
                     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1 shadow-sm border border-gray-100">
                         <img src="qr.JPEG" class="h-4">
                     </div>
