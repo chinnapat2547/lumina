@@ -268,25 +268,29 @@ while($c = mysqli_fetch_assoc($resAllCat)) { $categories_list[] = $c; }
                                 <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username']) ?></h3>
                             </div>
                             <div class="flex flex-col gap-3 mt-2">
-                                <?php if($isAdmin): ?>
-                                    <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
-                                        <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
-                                    </a>
-                                <?php elseif($isLoggedIn): ?>
-                                    <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                        จัดการบัญชี
-                                    </a>
-                                <?php else: ?>
-                                    <a href="../auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                        เข้าสู่ระบบ
-                                    </a>
-                                <?php endif; ?>
-                                <?php if($isLoggedIn): ?>
-                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                            <?php if($isAdmin): ?>
+                                <a href="admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                    <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
                                 </a>
-                                <?php endif; ?>
-                            </div>
+                            <?php elseif($isLoggedIn): ?>
+                                <a href="profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    จัดการบัญชี
+                                </a>
+                            <?php else: ?>
+                                <a href="auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
+                                </a>
+                                <a href="auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
+                                </a>
+                            <?php endif; ?>
+                            
+                            <?php if($isLoggedIn): ?>
+                            <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                            </a>
+                            <?php endif; ?>
+                        </div>
                         </div>
                     </div>
                 </div>
