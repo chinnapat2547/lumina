@@ -81,10 +81,13 @@ if (isset($u_id) && !$isAdmin) {
 // 2. ดึงข้อมูลหมวดหมู่จาก Database (Fix 4)
 // ==========================================
 $categories_list = [];
-$sqlCat = "SELECT * FROM category";
+// เพิ่ม ORDER BY เพื่อให้หมวดหมู่เรียงลำดับตาม ID เสมอ ไม่สลับไปมา
+$sqlCat = "SELECT * FROM category ORDER BY c_id ASC";
 $resCat = mysqli_query($conn, $sqlCat);
 if($resCat) {
     while($c = mysqli_fetch_assoc($resCat)) {
+        // 🟢 สร้างตัวแปรเพิ่มใน Array สำหรับแสดงผลแบบปัดบรรทัดตรงวงเล็บ 🟢
+        $c['display_name'] = preg_replace('/ ?\(/', '<br>(', htmlspecialchars($c['c_name']));
         $categories_list[] = $c;
     }
 }
@@ -356,12 +359,16 @@ $catStyles = [
 <div class="flex overflow-x-auto gap-8 pt-4 pb-8 no-scrollbar md:justify-center px-4">
     <?php foreach($categories_list as $index => $c): 
         $style = $catStyles[$index % count($catStyles)]; // สลับสไตล์ไปเรื่อยๆ
+        
+        // 🟢 เพิ่มโค้ดตรงนี้: ค้นหาวงเล็บภาษาไทย แล้วสั่งตัดขึ้นบรรทัดใหม่ (<br>)
+        $rawName = htmlspecialchars($c['c_name']);
+        $displayName = preg_replace('/ ?\(/', '<br>(', $rawName);
     ?>
     <a href="shop/category.php?id=<?= $c['c_id'] ?>" class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
         <div class="w-24 h-24 rounded-full <?= $style['bg'] ?> flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
             <span class="material-icons-round text-4xl <?= $style['text'] ?> group-hover:text-white"><?= $style['icon'] ?></span>
         </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition text-center text-sm leading-snug"><?= htmlspecialchars($c['c_name']) ?></span>
+        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition text-center text-sm leading-snug"><?= $displayName ?></span>
     </a>
     <?php endforeach; ?>
 </div>
