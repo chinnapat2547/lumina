@@ -23,7 +23,7 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
     $result = mysqli_stmt_get_result($stmt);
     if ($row = mysqli_fetch_assoc($result)) {
         $userData = $row;
-        if (!empty($row['u_image'])) {
+        if (!empty($row['u_image']) && file_exists("../profile/uploads/" . $row['u_image'])) {
             $profileImage = "../profile/uploads/" . $row['u_image'];
         } else {
             $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($row['u_username']) . "&background=F43F85&color=fff";
@@ -93,9 +93,9 @@ if (!$order) {
     exit();
 }
 
-// 🟢 ระบบดึงที่อยู่สำรอง (แก้ปัญหาที่อยู่ไม่โชว์)
-$displayAddress = $order['shipping_address'] ?? '';
-if (empty(trim($displayAddress))) {
+// ดึงที่อยู่จัดส่ง (ถ้าในบิลไม่มี ให้ดึงจากข้อมูล Profile ปกติ)
+$displayAddress = isset($order['shipping_address']) && !empty(trim($order['shipping_address'])) ? $order['shipping_address'] : '';
+if (empty($displayAddress)) {
     $sqlFallback = "SELECT * FROM user_address WHERE u_id = ? ORDER BY is_default DESC LIMIT 1";
     if($stmtFB = mysqli_prepare($conn, $sqlFallback)) {
         mysqli_stmt_bind_param($stmtFB, "i", $u_id);
@@ -111,10 +111,14 @@ if (empty(trim($displayAddress))) {
     }
 }
 
-// ดึงรายการสินค้า
+// ดึงรายการสินค้า พร้อมหมวดหมู่ (Category) และดึงรูปจาก Product ปกติมาสำรองด้วย
 $items = [];
 $subtotal = 0;
-$sqlItems = "SELECT * FROM `order_items` WHERE order_id = ?";
+$sqlItems = "SELECT oi.*, p.p_image as real_p_image, c.c_name 
+             FROM `order_items` oi 
+             LEFT JOIN `product` p ON oi.p_id = p.p_id 
+             LEFT JOIN `category` c ON p.c_id = c.c_id 
+             WHERE oi.order_id = ?";
 if ($stmtItems = mysqli_prepare($conn, $sqlItems)) {
     mysqli_stmt_bind_param($stmtItems, "i", $order_id);
     mysqli_stmt_execute($stmtItems);
@@ -133,10 +137,11 @@ $thai_months = ["", "มกราคม", "กุมภาพันธ์", "ม
 $time = strtotime($order['created_at']);
 $formatted_date = date('d', $time) . ' ' . $thai_months[date('n', $time)] . ' ' . (date('Y', $time) + 543) . ' • ' . date('H:i', $time) . ' น.';
 
-// 🟢 สร้างเลขพัสดุแบบสุ่ม 1 ครั้ง (ใช้ ID คำนวณให้คงที่)
-$trackingNo = 'TH' . str_pad(($order_id * 889977) % 10000000000, 10, '0', STR_PAD_LEFT) . 'TH';
+// 🟢 สร้างเลขพัสดุแบบสุ่ม 1 ครั้ง (ล็อกค่าตาม Order ID ทำให้เลขไม่เปลี่ยนเวลาย้อนกลับมาดู)
+srand($order_id + 9999); 
+$trackingNo = 'TH' . rand(1000000000, 9999999999) . 'TH';
+srand(); // รีเซ็ต Seed คืนค่าปกติเพื่อไม่ให้กระทบฟังก์ชันอื่น
 
-// ฟังก์ชันแปลงสถานะ
 function getStatusBadge($status) {
     switch($status) {
         case 'pending': return ['text' => 'ที่ต้องชำระเงิน', 'color' => 'bg-orange-100 text-orange-600 border-orange-200', 'icon' => 'payment'];
@@ -150,13 +155,13 @@ function getStatusBadge($status) {
 $badge = getStatusBadge($order['status']);
 
 function getPaymentMethodName($method) {
-    $method = strtolower(trim($method));
+    $method = strtolower(trim($method ?? ''));
     if ($method == 'credit_card') return 'บัตรเครดิต / เดบิต';
     if ($method == 'cod') return 'ชำระเงินปลายทาง (COD)';
-    return 'พร้อมเพย์ / โอนผ่านบัญชีธนาคาร';
+    return 'พร้อมเพย์ / โอนผ่านบัญชีธนาคาร'; // ครอบคลุมค่าว่าง หรือ '0' ที่ผิดพลาด
 }
 function getPaymentMethodIcon($method) {
-    $method = strtolower(trim($method));
+    $method = strtolower(trim($method ?? ''));
     if ($method == 'credit_card') return 'credit_card';
     if ($method == 'cod') return 'delivery_dining';
     return 'qr_code_2';
@@ -198,6 +203,7 @@ function getPaymentMethodIcon($method) {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
+        /* แอนิเมชันก้อนเมฆจากหน้า Home */
         .cloud-gradient {
             background: radial-gradient(circle at 10% 20%, rgba(244, 63, 133, 0.05) 0%, transparent 30%),
                         radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.05) 0%, transparent 30%);
@@ -287,20 +293,26 @@ function getPaymentMethodIcon($method) {
                 
                 <div class="space-y-6">
                     <?php foreach ($items as $item): 
-                        // 🟢 แก้ที่ 1: ดึงรูปภาพให้ถูกต้อง ไม่ต้องเช็ค file_exists เพื่อกันพาร์ทผิด
-                        $imgUrl = (!empty($item['p_image'])) 
-                                    ? "../uploads/products/" . $item['p_image'] 
-                                    : "https://via.placeholder.com/150";
+                        // แก้ปัญหารูปภาพไม่ขึ้น ถ้าใน order_items พัง ให้ไปดึงจาก product table แทน (real_p_image)
+                        $imgName = (!empty($item['p_image']) && $item['p_image'] !== '0') ? $item['p_image'] : $item['real_p_image'];
+                        $imgUrl = (!empty($imgName)) ? "../uploads/products/" . $imgName : "https://via.placeholder.com/150";
                     ?>
                         <div class="flex gap-4 items-start sm:items-center">
-                            <div class="w-20 h-20 rounded-2xl bg-gray-50 dark:bg-gray-700 overflow-hidden flex-shrink-0 border border-gray-100 dark:border-gray-600 relative">
-                                <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover">
+                            <div class="w-24 h-24 rounded-2xl bg-gray-50 dark:bg-gray-700 overflow-hidden flex-shrink-0 border border-gray-100 dark:border-gray-600 relative p-1">
+                                <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover rounded-xl">
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-bold text-gray-800 dark:text-white text-sm md:text-base line-clamp-2"><?= htmlspecialchars($item['p_name']) ?></h4>
+                                <h4 class="font-bold text-gray-800 dark:text-white text-base leading-tight mb-1"><?= htmlspecialchars($item['p_name']) ?></h4>
                                 
-                                <div class="mt-1 text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                    ฿<?= number_format($item['price']) ?> <span class="mx-1">x</span> <?= $item['quantity'] ?>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1.5">หมวดหมู่: <?= htmlspecialchars($item['c_name'] ?? 'ไม่ระบุหมวดหมู่') ?></p>
+                                
+                                <?php if (!empty($item['selected_color'])): ?>
+                                    <p class="text-[11px] font-bold text-primary bg-pink-50 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md border border-pink-100 dark:border-gray-600">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
+                                <?php endif; ?>
+                                
+                                <div class="flex justify-between items-end mt-2">
+                                    <span class="text-sm text-gray-500 dark:text-gray-400 font-medium">฿<?= number_format($item['price']) ?> <span class="mx-1">x</span> <?= $item['quantity'] ?></span>
+                                    <span class="text-lg font-bold text-primary">฿<?= number_format($item['price'] * $item['quantity']) ?></span>
                                 </div>
                             </div>
                         </div>
@@ -353,7 +365,7 @@ function getPaymentMethodIcon($method) {
                     
                     <div class="flex justify-between text-gray-500 dark:text-gray-400">
                         <span>ส่วนลดโค้ด</span>
-                        <span class="font-medium text-primary">- ฿0</span>
+                        <span class="font-bold text-primary">- ฿0</span>
                     </div>
 
                     <div class="flex justify-between text-gray-500 dark:text-gray-400">
@@ -379,16 +391,16 @@ function getPaymentMethodIcon($method) {
                         <form action="" method="POST" id="cancelForm">
                             <input type="hidden" name="action" value="cancel_order">
                             <input type="hidden" name="order_id" value="<?= $order_id ?>">
-                            <button type="button" onclick="confirmCancel()" class="w-full px-6 py-3.5 bg-white dark:bg-gray-800 border-2 border-red-500 text-red-500 rounded-xl font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition shadow-sm">
-                                ยกเลิกคำสั่งซื้อ
+                            <button type="button" onclick="confirmCancel()" class="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-white dark:bg-gray-800 border-2 border-red-500 text-red-500 rounded-xl font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition shadow-sm">
+                                <span class="material-icons-round text-lg">cancel</span> ยกเลิกคำสั่งซื้อ
                             </button>
                         </form>
                     <?php elseif ($order['status'] === 'completed'): ?>
                         <form action="" method="POST" id="refundForm">
                             <input type="hidden" name="action" value="refund_order">
                             <input type="hidden" name="order_id" value="<?= $order_id ?>">
-                            <button type="button" onclick="confirmRefund()" class="w-full px-6 py-3.5 bg-white dark:bg-gray-800 border-2 border-orange-500 text-orange-500 rounded-xl font-bold hover:bg-orange-50 dark:hover:bg-orange-900/20 transition shadow-sm">
-                                ขอคืนเงิน / คืนสินค้า
+                            <button type="button" onclick="confirmRefund()" class="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-white dark:bg-gray-800 border-2 border-orange-500 text-orange-500 rounded-xl font-bold hover:bg-orange-50 dark:hover:bg-orange-900/20 transition shadow-sm">
+                                <span class="material-icons-round text-lg">currency_exchange</span> ขอคืนเงิน / คืนสินค้า
                             </button>
                         </form>
                     <?php endif; ?>
