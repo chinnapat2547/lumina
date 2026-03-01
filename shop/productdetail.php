@@ -26,7 +26,7 @@ if (isset($_SESSION['u_id'])) {
             if (!empty($userData['u_image']) && file_exists("../uploads/" . $userData['u_image'])) {
                 $profileImage = "../uploads/" . $userData['u_image'];
             } else {
-                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($userData['u_username']) . "&background=F43F85&color=fff";
+                $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($displayName) . "&background=F43F85&color=fff";
             }
         }
         mysqli_stmt_close($stmtUser);
@@ -245,7 +245,7 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                 <div class="relative group flex items-center">
                     <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
                         <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=ec2d88&color=fff'"/>
+                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
                         </div>
                     </a>
                     
