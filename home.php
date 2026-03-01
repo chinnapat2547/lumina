@@ -269,11 +269,6 @@ if($resFeat) {
                                     <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
                                 </a>
                             <?php endif; ?>
-                            <?php else: ?>
-                                <a href="auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span> สมัครสมาชิก
-                                </a>
-                            <?php endif; ?>
                             
                             <?php if($isLoggedIn): ?>
                             <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
