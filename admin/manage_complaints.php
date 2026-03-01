@@ -5,8 +5,11 @@ require_once '../config/connectdbuser.php';
 $adminName = $_SESSION['admin_username'] ?? 'Admin Nina'; 
 $adminAvatar = "https://ui-avatars.com/api/?name=" . urlencode($adminName) . "&background=a855f7&color=fff";
 
-// แจ้งเตือน Sidebar ออเดอร์
+// ==========================================
+// ส่วนดึงข้อมูลแจ้งเตือนสำหรับ Sidebar (ต้องมีทุกหน้า)
+// ==========================================
 $countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
+$newComplaints = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `contact_messages` WHERE status='pending' OR status IS NULL"))['c'] ?? 0;
 
 // ==========================================
 // 1. จัดการลบคำร้องเรียน (GET)
@@ -106,6 +109,8 @@ function getComplaintBadge($status) {
     ];
     return $badges[$status] ?? ['text' => 'รอตรวจสอบ', 'class' => 'bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:border-red-800', 'icon' => 'mark_email_unread'];
 }
+
+
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>

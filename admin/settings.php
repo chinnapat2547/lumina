@@ -3,6 +3,12 @@ session_start();
 require_once '../config/connectdbuser.php';
 
 // ==========================================
+// ส่วนดึงข้อมูลแจ้งเตือนสำหรับ Sidebar (ต้องมีทุกหน้า)
+// ==========================================
+$countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
+$newComplaints = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `contact_messages` WHERE status='pending' OR status IS NULL"))['c'] ?? 0;
+
+// ==========================================
 // 1. ตรวจสอบสิทธิ์
 // ==========================================
 // if (!isset($_SESSION['admin_id'])) { header("Location: ../auth/login.php"); exit(); }

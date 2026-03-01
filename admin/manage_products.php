@@ -8,6 +8,12 @@ $resCat = mysqli_query($conn, "SELECT * FROM category");
 while($c = mysqli_fetch_assoc($resCat)) { $categories[] = $c; }
 
 // ==========================================
+// ส่วนดึงข้อมูลแจ้งเตือนสำหรับ Sidebar (ต้องมีทุกหน้า)
+// ==========================================
+$countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
+$newComplaints = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `contact_messages` WHERE status='pending' OR status IS NULL"))['c'] ?? 0;
+
+// ==========================================
 // 1. จัดการเพิ่มสินค้า (POST)
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'add_product') {

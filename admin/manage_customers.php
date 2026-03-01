@@ -5,10 +5,11 @@ require_once '../config/connectdbuser.php';
 $adminName = $_SESSION['admin_username'] ?? 'Admin Nina'; 
 $adminAvatar = "https://ui-avatars.com/api/?name=Admin&background=a855f7&color=fff";
 
-// แจ้งเตือน Sidebar
+// ==========================================
+// ส่วนดึงข้อมูลแจ้งเตือนสำหรับ Sidebar (ต้องมีทุกหน้า)
+// ==========================================
 $countPending = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `orders` WHERE status='pending'"))['c'] ?? 0;
-$today = date('Y-m-d');
-$newComplaints = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(id) as new_complaints FROM `contact_messages` WHERE DATE(created_at) = '$today'"))['new_complaints'] ?? 0;
+$newComplaints = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM `contact_messages` WHERE status='pending' OR status IS NULL"))['c'] ?? 0;
 
 // ==========================================
 // การลบข้อมูลลูกค้า
