@@ -166,6 +166,33 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
     }
     mysqli_stmt_close($stmtCartCount);
 }
+
+// ==========================================
+// [เพิ่มใหม่] ดึงคำสั่งซื้อล่าสุด 3 รายการ
+// ==========================================
+$recentOrders = [];
+$sqlRecentOrders = "SELECT order_no, total_amount, status, created_at FROM `orders` WHERE u_id = ? ORDER BY created_at DESC LIMIT 3";
+if ($stmtRecent = mysqli_prepare($conn, $sqlRecentOrders)) {
+    mysqli_stmt_bind_param($stmtRecent, "i", $u_id);
+    mysqli_stmt_execute($stmtRecent);
+    $resRecent = mysqli_stmt_get_result($stmtRecent);
+    while ($r = mysqli_fetch_assoc($resRecent)) {
+        $recentOrders[] = $r;
+    }
+    mysqli_stmt_close($stmtRecent);
+}
+
+// ฟังก์ชันสำหรับสีสถานะ
+function getStatusData($status) {
+    switch($status) {
+        case 'pending': return ['text' => 'ที่ต้องชำระ', 'color' => 'bg-orange-100 text-orange-600 dark:bg-orange-900/30'];
+        case 'processing': return ['text' => 'เตรียมจัดส่ง', 'color' => 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'];
+        case 'shipped': return ['text' => 'กำลังจัดส่ง', 'color' => 'bg-purple-100 text-purple-600 dark:bg-purple-900/30'];
+        case 'completed': return ['text' => 'สำเร็จ', 'color' => 'bg-green-100 text-green-600 dark:bg-green-900/30'];
+        case 'cancelled': return ['text' => 'ยกเลิก', 'color' => 'bg-red-100 text-red-600 dark:bg-red-900/30'];
+        default: return ['text' => 'ไม่ทราบ', 'color' => 'bg-gray-100 text-gray-600 dark:bg-gray-800'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -380,29 +407,37 @@ if ($stmtCartCount = mysqli_prepare($conn, $sqlCartCount)) {
 </div>
 </div>
 <div class="bg-card-light dark:bg-card-dark rounded-3xl p-6 shadow-soft border border-transparent dark:border-gray-700 flex flex-col justify-between h-full">
-<div class="flex justify-between items-center mb-6">
-<h2 class="text-xl font-bold flex items-center gap-2">
-<span class="material-icons-round text-primary">local_shipping</span>
-                                    คำสั่งซื้อล่าสุด
-                                </h2>
-<a class="text-xs text-gray-500 hover:text-primary transition" href="#">ดูทั้งหมด ></a>
-</div>
-<div class="flex-grow flex flex-col items-center justify-center text-center opacity-60">
-<span class="material-icons-round text-5xl text-gray-300 dark:text-gray-600 mb-2">inbox</span>
-<p class="text-gray-500 dark:text-gray-400 text-sm">ยังไม่มีคำสั่งซื้อล่าสุดในขณะนี้</p>
-</div>
-</div>
-</div>
-<div class="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 flex items-start gap-4 border border-blue-100 dark:border-blue-800/30">
-<div class="bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 p-2 rounded-xl">
-<span class="material-icons-round">lightbulb</span>
-</div>
-<div>
-<h4 class="font-bold text-blue-800 dark:text-blue-200 text-sm mb-1">เคล็ดลับความงามประจำวัน</h4>
-<p class="text-xs text-blue-600 dark:text-blue-300">อย่าลืมทาครีมกันแดดทุกครั้งก่อนออกจากบ้าน แม้ในวันที่ไม่มีแดด เพื่อผิวที่อ่อนเยาว์และกระจ่างใสนะคะ!</p>
-</div>
-</div>
-</section>
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold flex items-center gap-2">
+            <span class="material-icons-round text-primary">local_shipping</span>
+            คำสั่งซื้อล่าสุด
+        </h2>
+        <a class="text-xs font-bold text-primary hover:text-pink-600 transition" href="orders.php">ดูทั้งหมด ></a>
+    </div>
+    
+    <div class="flex-grow flex flex-col gap-3">
+        <?php if (empty($recentOrders)): ?>
+            <div class="flex-grow flex flex-col items-center justify-center text-center opacity-60 py-6">
+                <span class="material-icons-round text-5xl text-gray-300 dark:text-gray-600 mb-2">inbox</span>
+                <p class="text-gray-500 dark:text-gray-400 text-sm">ยังไม่มีคำสั่งซื้อล่าสุดในขณะนี้</p>
+            </div>
+        <?php else: ?>
+            <?php foreach($recentOrders as $ro): 
+                $statusBadge = getStatusData($ro['status']);
+            ?>
+                <a href="orders.php" class="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 hover:border-pink-200 transition-colors group">
+                    <div class="flex flex-col">
+                        <span class="text-sm font-bold text-gray-800 dark:text-white group-hover:text-primary transition-colors">#<?= htmlspecialchars($ro['order_no']) ?></span>
+                        <span class="text-[11px] text-gray-500"><?= date('d M Y, H:i', strtotime($ro['created_at'])) ?></span>
+                    </div>
+                    <div class="flex flex-col items-end gap-1.5">
+                        <span class="text-sm font-bold text-primary">฿<?= number_format($ro['total_amount']) ?></span>
+                        <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md <?= $statusBadge['color'] ?>"><?= $statusBadge['text'] ?></span>
+                    </div>
+                </a>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
 </div>
 </main>
 
