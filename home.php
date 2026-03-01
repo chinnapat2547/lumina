@@ -30,7 +30,6 @@ if (isset($_SESSION['admin_id'])) {
         if ($row = mysqli_fetch_assoc($result)) {
             $userData['u_username'] = $row['admin_username'];
             $userData['u_email'] = 'Administrator Mode'; // เปลี่ยนอีเมลเป็นคำว่า Admin
-            // ใช้รูปมงกุฎหรือสัญลักษณ์ Admin
             $profileImage = "https://ui-avatars.com/api/?name=Admin&background=a855f7&color=fff";
         }
         mysqli_stmt_close($stmt);
@@ -77,6 +76,31 @@ if (isset($u_id) && !$isAdmin) {
         mysqli_stmt_close($stmtCartCount);
     }
 }
+
+// ==========================================
+// 2. ดึงข้อมูลหมวดหมู่จาก Database (Fix 4)
+// ==========================================
+$categories_list = [];
+$sqlCat = "SELECT * FROM category";
+$resCat = mysqli_query($conn, $sqlCat);
+if($resCat) {
+    while($c = mysqli_fetch_assoc($resCat)) {
+        $categories_list[] = $c;
+    }
+}
+
+// ==========================================
+// 3. ดึงสินค้าแนะนำแบบสุ่ม 20 รายการ (Fix 2)
+// ==========================================
+$featured_products = [];
+// เลือกสินค้าที่เปิดขาย (status = 1) สุ่มมา 20 ตัว
+$sqlFeat = "SELECT p_id, p_name, p_price, p_image, p_stock FROM product WHERE status = 1 ORDER BY RAND() LIMIT 20";
+$resFeat = mysqli_query($conn, $sqlFeat);
+if($resFeat) {
+    while($p = mysqli_fetch_assoc($resFeat)) {
+        $featured_products[] = $p;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -94,18 +118,18 @@ if (isset($u_id) && !$isAdmin) {
         theme: {
           extend: {
             colors: {
-              primary: "#ec2d88", // Hot pink from button
-              secondary: "#fca5a5", // Soft pink
-              accent: "#a5b4fc", // Soft purple/blue
+              primary: "#ec2d88", 
+              secondary: "#fca5a5", 
+              accent: "#a5b4fc", 
               "background-light": "#ffffff",
               "background-dark": "#18181b",
-              "surface-light": "#fff5f9", // Very light pink background
+              "surface-light": "#fff5f9", 
               "surface-dark": "#27272a",
               "card-light": "#ffffff",
               "card-dark": "#27272a",
               "text-main-light": "#1f2937",
               "text-main-dark": "#f3f4f6",
-              "input-bg": "#fff0f6", // Light pinkish input bg
+              "input-bg": "#fff0f6", 
             },
             fontFamily: {
               display: ["Prompt", "sans-serif"],
@@ -124,7 +148,9 @@ if (isset($u_id) && !$isAdmin) {
         },
       };
     </script>
-<style>html { scroll-behavior: smooth; }@keyframes gradient-xy {
+<style>
+        html { scroll-behavior: smooth; }
+        @keyframes gradient-xy {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
@@ -132,7 +158,8 @@ if (isset($u_id) && !$isAdmin) {
         .animate-gradient {
             background-size: 200% 200%;
             animation: gradient-xy 15s ease infinite;
-        }.no-scrollbar::-webkit-scrollbar {
+        }
+        .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
         .no-scrollbar {
@@ -166,12 +193,11 @@ if (isset($u_id) && !$isAdmin) {
                 </button>
                 <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">TONERPADS (โทนเนอร์แพด)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">BLUSH (บลัชออน)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">LIPS (ริมฝีปาก)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">SKIN (ผิว)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">EYES (ตา)</a>
-                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">ACCESSORIES (อุปกรณ์เสริม)</a>
+                        <?php foreach($categories_list as $c): ?>
+                            <a href="shop/category.php?id=<?= $c['c_id'] ?>" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">
+                                <?= htmlspecialchars($c['c_name']) ?>
+                            </a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -231,38 +257,29 @@ if (isset($u_id) && !$isAdmin) {
                                 <a href="admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
                                     <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
                                 </a>
-                                <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
-                                </a>
                             <?php elseif($isLoggedIn): ?>
                                 <a href="profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
                                     จัดการบัญชี
-                                </a>
-                                <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
                                 </a>
                             <?php else: ?>
                                 <a href="auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
                                     <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
                                 </a>
-                                <a href="auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
-                                </a>
                             <?php endif; ?>
-                        </div>
-
-                        <div class="flex justify-center items-center gap-2 mt-5 text-[11px] text-gray-400">
-                            <a href="#" class="hover:text-primary">นโยบายความเป็นส่วนตัว</a>
-                            <span>•</span>
-                            <a href="#" class="hover:text-primary">ข้อกำหนดบริการ</a>
+                            
+                            <?php if($isLoggedIn): ?>
+                            <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                            </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
-
+        </div>
     </div>
-</div>
 </nav>
+
 <header class="relative overflow-hidden bg-gradient-to-r from-pink-100 via-purple-100 to-blue-100 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 animate-gradient">
 <div class="absolute top-20 left-10 w-32 h-32 bg-white/30 rounded-full blur-2xl animate-pulse"></div>
 <div class="absolute bottom-10 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-3xl"></div>
@@ -320,74 +337,95 @@ if (isset($u_id) && !$isAdmin) {
 </div>
 </div>
 </header>
+
 <section class="py-16 bg-surface-light dark:bg-background-dark">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 <h2 class="text-3xl font-bold text-center mb-10 text-gray-800 dark:text-white">หมวดหมู่สินค้า (Categories)</h2>
+
+<?php
+// กำหนดสไตล์สีพาสเทลและไอคอนแบบวนลูปเพื่อให้ดูสวยงามตามแบบเดิม
+$catStyles = [
+    ['bg' => 'bg-blue-100 dark:bg-gray-800', 'text' => 'text-blue-500 dark:text-blue-300', 'icon' => 'water_drop'],
+    ['bg' => 'bg-pink-100 dark:bg-gray-800', 'text' => 'text-pink-500 dark:text-pink-300', 'icon' => 'face_retouching_natural'],
+    ['bg' => 'bg-red-100 dark:bg-gray-800', 'text' => 'text-red-500 dark:text-red-300', 'icon' => 'favorite'],
+    ['bg' => 'bg-green-100 dark:bg-gray-800', 'text' => 'text-green-500 dark:text-green-300', 'icon' => 'spa'],
+    ['bg' => 'bg-purple-100 dark:bg-gray-800', 'text' => 'text-purple-500 dark:text-purple-300', 'icon' => 'visibility'],
+    ['bg' => 'bg-yellow-100 dark:bg-gray-800', 'text' => 'text-yellow-600 dark:text-yellow-300', 'icon' => 'brush']
+];
+?>
 <div class="flex overflow-x-auto gap-8 pt-4 pb-8 no-scrollbar md:justify-center px-4">
-    
-    <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
-        <div class="w-24 h-24 rounded-full bg-blue-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
-            <span class="material-icons-round text-4xl text-blue-500 group-hover:text-white dark:text-blue-300">water_drop</span>
+    <?php foreach($categories_list as $index => $c): 
+        $style = $catStyles[$index % count($catStyles)]; // สลับสไตล์ไปเรื่อยๆ
+    ?>
+    <a href="shop/category.php?id=<?= $c['c_id'] ?>" class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
+        <div class="w-24 h-24 rounded-full <?= $style['bg'] ?> flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
+            <span class="material-icons-round text-4xl <?= $style['text'] ?> group-hover:text-white"><?= $style['icon'] ?></span>
         </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">TONERPADS<br>(โทนเนอร์แพด)</span>
-    </div>
-
-    <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
-        <div class="w-24 h-24 rounded-full bg-pink-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
-            <span class="material-icons-round text-4xl text-pink-500 group-hover:text-white dark:text-pink-300">face_retouching_natural</span>
-        </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">BLUSH<br>(บลัชออน)</span>
-    </div>
-
-    <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
-        <div class="w-24 h-24 rounded-full bg-red-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
-            <span class="material-icons-round text-4xl text-red-500 group-hover:text-white dark:text-red-300">favorite</span>
-        </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">LIPS<br>(ริมฝีปาก)</span>
-    </div>
-
-    <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
-        <div class="w-24 h-24 rounded-full bg-green-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
-            <span class="material-icons-round text-4xl text-green-500 group-hover:text-white dark:text-green-300">spa</span>
-        </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">SKIN<br>(ผิว)</span>
-    </div>
-
-    <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
-        <div class="w-24 h-24 rounded-full bg-purple-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
-            <span class="material-icons-round text-4xl text-purple-500 group-hover:text-white dark:text-purple-300">visibility</span>
-        </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">EYES<br>(อุปกรณ์เสริม)</span>
-    </div>
-
-    <div class="flex flex-col items-center gap-3 min-w-[100px] cursor-pointer group">
-        <div class="w-24 h-24 rounded-full bg-yellow-100 dark:bg-gray-800 flex items-center justify-center shadow-md group-hover:scale-110 transition duration-300 group-hover:bg-primary group-hover:text-white">
-            <span class="material-icons-round text-4xl text-yellow-600 group-hover:text-white dark:text-yellow-300">brush</span>
-        </div>
-        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary dark:group-hover:text-primary transition text-center text-sm leading-snug">ACCESSORIES<br>(อุปกรณ์เสริม)</span>
-    </div>
-
+        <span class="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary transition text-center text-sm leading-snug"><?= htmlspecialchars($c['c_name']) ?></span>
+    </a>
+    <?php endforeach; ?>
 </div>
+
 </div>
 </section>
+
 <section class="py-16 bg-white dark:bg-background-dark">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 <div class="flex justify-between items-end mb-10">
-<div>
-<span class="text-primary font-bold tracking-wider text-sm uppercase">Recommended for you</span>
-<h2 class="text-3xl font-bold text-gray-800 dark:text-white mt-2">สินค้าแนะนำ (Featured)</h2>
-</div>
-<a class="text-gray-500 hover:text-primary flex items-center gap-1 font-medium transition" href="#">
-                    ดูทั้งหมด <span class="material-icons-round">chevron_right</span>
-</a>
+    <div>
+        <span class="text-primary font-bold tracking-wider text-sm uppercase">Recommended for you</span>
+        <h2 class="text-3xl font-bold text-gray-800 dark:text-white mt-2">สินค้าแนะนำ (Featured)</h2>
+    </div>
+    <a class="text-gray-500 hover:text-primary flex items-center gap-1 font-medium transition" href="shop/products.php">
+        ดูทั้งหมด <span class="material-icons-round">chevron_right</span>
+    </a>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+<div class="relative group/slider">
+    <button onclick="document.getElementById('featuredSlider').scrollBy({left: -350, behavior: 'smooth'})" class="absolute left-[-20px] top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-primary opacity-0 group-hover/slider:opacity-100 transition-opacity border border-pink-50 dark:border-gray-700 hover:scale-110 hidden md:flex">
+        <span class="material-icons-round text-2xl">chevron_left</span>
+    </button>
     
+    <div id="featuredSlider" class="grid grid-rows-2 grid-flow-col gap-6 overflow-x-auto no-scrollbar snap-x scroll-smooth pb-6 px-2" style="grid-auto-columns: minmax(260px, 1fr);">
+        <?php foreach($featured_products as $p): 
+            $p_img = (!empty($p['p_image']) && file_exists("uploads/products/" . $p['p_image'])) 
+                        ? "uploads/products/" . $p['p_image'] 
+                        : "https://via.placeholder.com/400x400.png?text=No+Image";
+        ?>
+        <a href="shop/productdetail.php?id=<?= $p['p_id'] ?>" class="snap-start bg-white dark:bg-surface-dark rounded-[24px] p-4 shadow-soft hover:shadow-glow transition-all duration-300 group border border-transparent dark:border-gray-700 flex flex-col h-full w-[260px]">
+            <div class="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 relative flex items-center justify-center">
+                <img alt="<?= htmlspecialchars($p['p_name']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="<?= $p_img ?>"/>
+                <?php if($p['p_stock'] <= 0): ?>
+                    <div class="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-sm">
+                        <span class="bg-white text-gray-800 font-bold px-4 py-1.5 rounded-full shadow-lg text-xs">สินค้าหมด</span>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="flex-1 flex flex-col px-1">
+                <h3 class="text-[15px] font-display font-bold text-gray-800 dark:text-white mb-1 leading-tight line-clamp-2 group-hover:text-primary transition-colors"><?= htmlspecialchars($p['p_name']) ?></h3>
+                <div class="mt-auto flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <span class="text-lg font-bold text-primary">฿<?= number_format($p['p_price']) ?></span>
+                    <div class="w-8 h-8 rounded-full bg-pink-50 dark:bg-gray-700 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+                        <span class="material-icons-round text-[16px]">shopping_cart</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+        <?php endforeach; ?>
+        
+        <?php if(empty($featured_products)): ?>
+            <p class="col-span-full text-center text-gray-500 py-10 w-full text-lg">ยังไม่มีสินค้าแนะนำในขณะนี้</p>
+        <?php endif; ?>
+    </div>
+
+    <button onclick="document.getElementById('featuredSlider').scrollBy({left: 350, behavior: 'smooth'})" class="absolute right-[-20px] top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-primary opacity-0 group-hover/slider:opacity-100 transition-opacity border border-pink-50 dark:border-gray-700 hover:scale-110 hidden md:flex">
+        <span class="material-icons-round text-2xl">chevron_right</span>
+    </button>
 </div>
 
 </div>
 </section>
+
 <section class="py-20 bg-blue-50 dark:bg-gray-900 relative overflow-hidden">
 <div class="absolute top-10 left-20 opacity-30 animate-pulse">
 <span class="material-icons-round text-8xl text-white dark:text-gray-700">cloud</span>
@@ -488,17 +526,13 @@ if (isset($u_id) && !$isAdmin) {
 </footer>
 
 <script>
-    // 1. ฟังก์ชันทำงานอัตโนมัติเมื่อโหลดหน้าเว็บ: เช็คว่าเคยเซฟธีมมืดไว้ไหม?
     if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.classList.add('dark');
     }
 
-    // 2. ฟังก์ชันเมื่อกดปุ่ม: สลับธีมและเซฟค่าลงระบบ
     function toggleTheme() {
         const htmlEl = document.documentElement;
         htmlEl.classList.toggle('dark');
-        
-        // เช็คว่าตอนนี้เป็นธีมมืดหรือสว่าง แล้วเซฟทับลงไป
         if (htmlEl.classList.contains('dark')) {
             localStorage.setItem('theme', 'dark');
         } else {
