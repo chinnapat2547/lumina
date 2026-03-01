@@ -207,37 +207,34 @@ $stat_total = count($customers);
                     <span class="material-icons-round group-hover:scale-110 transition-transform">inventory_2</span>
                     <span class="font-medium text-[15px]">จัดการสินค้า</span>
                 </a>
-                
                 <a class="nav-item flex items-center justify-between px-5 py-3.5 rounded-2xl text-text-muted dark:text-gray-400 transition-all duration-300 group hover:pl-6" href="manage_orders.php">
                     <div class="flex items-center gap-4">
                         <span class="material-icons-round group-hover:scale-110 transition-transform">receipt_long</span>
                         <span class="font-medium text-[15px]">รายการสั่งซื้อ</span>
                     </div>
-                    <?php if(!empty($countPending) && (int)$countPending > 0): ?>
+                    <?php if(isset($countPending) && $countPending > 0): ?>
                         <span class="flex items-center justify-center w-6 h-6 bg-primary text-white text-[12px] font-black rounded-full shadow-sm"><?= $countPending ?></span>
                     <?php endif; ?>
                 </a>
-                
                 <a class="nav-item-active flex items-center gap-4 px-5 py-3.5 rounded-2xl transition-all duration-300 group" href="manage_customers.php">
                     <span class="material-icons-round">group</span>
                     <span class="font-bold text-[15px]">ข้อมูลลูกค้า</span>
                 </a>
-                
                 <a class="nav-item flex items-center justify-between px-5 py-3.5 rounded-2xl text-text-muted dark:text-gray-400 transition-all duration-300 group hover:pl-6" href="manage_complaints.php">
                     <div class="flex items-center gap-4">
                         <span class="material-icons-round group-hover:scale-110 transition-transform">forum</span>
                         <span class="font-medium text-[15px]">คำร้องเรียน</span>
                     </div>
-                    <?php if(!empty($newComplaints) && (int)$newComplaints > 0): ?>
-                        <span class="flex items-center justify-center w-6 h-6 bg-primary text-white text-[12px] font-black rounded-full shadow-sm"><?= $newComplaints ?></span>
+                    <?php if($newComplaints > 0): ?>
+                        <span class="bg-primary text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm"><?= $newComplaints ?></span>
                     <?php endif; ?>
                 </a>
-                
                 <a class="nav-item flex items-center gap-4 px-5 py-3.5 rounded-2xl text-text-muted dark:text-gray-400 transition-all duration-300 group hover:pl-6 mt-2" href="settings.php">
                     <span class="material-icons-round group-hover:scale-110 transition-transform">settings</span>
                     <span class="font-medium text-[15px]">ตั้งค่าระบบ</span>
                 </a>
             </nav>
+        </div>
         
         <div class="p-5 rounded-2xl bg-gradient-to-br from-pink-50 to-purple-50 dark:from-gray-800 dark:to-gray-800 border border-pink-100 dark:border-gray-700 flex items-center gap-3 shadow-sm">
             <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center text-primary shadow-sm">
