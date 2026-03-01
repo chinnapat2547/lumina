@@ -59,7 +59,8 @@ if (isset($_SESSION['admin_id'])) {
 $cartItems = [];
 $subtotal = 0;
 
-$sqlCart = "SELECT c.cart_id, c.quantity, p.p_id, p.p_name, p.p_price FROM `cart` c JOIN `product` p ON c.p_id = p.p_id WHERE c.u_id = ?";
+// 🟢 แก้ไข: เพิ่ม c.selected_color และ p.p_image 🟢
+$sqlCart = "SELECT c.cart_id, c.quantity, c.selected_color, p.p_id, p.p_name, p.p_price, p.p_image FROM `cart` c JOIN `product` p ON c.p_id = p.p_id WHERE c.u_id = ?";
 if ($stmtCart = mysqli_prepare($conn, $sqlCart)) {
     mysqli_stmt_bind_param($stmtCart, "i", $u_id);
     mysqli_stmt_execute($stmtCart);
@@ -166,24 +167,28 @@ if (isset($_SESSION['order_saved']) && $_SESSION['order_saved'] === true) {
     if ($should_save_order) {
         $orderNo = "ORD" . date('Ymd') . rand(1000, 9999);
         
-        // 🟢 ให้สถานะเป็น processing ทั้งหมด (รวมถึง COD จะไปอยู่ใน 'ที่ต้องจัดส่ง')
         $status = 'processing';
         
         $pm = $checkoutData['payment_method'];
         $sm = $checkoutData['shipping_method'];
+        $addr = $checkoutData['shipping_address'] ?? 'ไม่ระบุที่อยู่'; // 🟢 รับที่อยู่จัดส่ง
         
-        $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, total_amount, status, payment_method, shipping_method, slip_image) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        // 🟢 แก้ไข: เพิ่ม shipping_address 🟢
+        $sqlInsertOrder = "INSERT INTO `orders` (order_no, u_id, shipping_address, total_amount, status, payment_method, shipping_method, slip_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         if ($stmtOrder = mysqli_prepare($conn, $sqlInsertOrder)) {
-            mysqli_stmt_bind_param($stmtOrder, "sidsiss", $orderNo, $u_id, $netTotal, $status, $pm, $sm, $slip_name);
+            mysqli_stmt_bind_param($stmtOrder, "sisdsiss", $orderNo, $u_id, $addr, $netTotal, $status, $pm, $sm, $slip_name);
             
             if(mysqli_stmt_execute($stmtOrder)) {
                 $newOrderId = mysqli_insert_id($conn);
                 
                 foreach ($cartItems as $item) {
                     $img = $item['p_image'] ?? '';
-                    $sqlInsertItem = "INSERT INTO `order_items` (order_id, p_id, p_name, p_image, price, quantity) VALUES (?, ?, ?, ?, ?, ?)";
+                    $color = $item['selected_color'] ?? ''; // 🟢 รับสีสินค้า
+                    
+                    // 🟢 แก้ไข: เพิ่ม selected_color 🟢
+                    $sqlInsertItem = "INSERT INTO `order_items` (order_id, p_id, p_name, selected_color, p_image, price, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)";
                     if ($stmtItem = mysqli_prepare($conn, $sqlInsertItem)) {
-                        mysqli_stmt_bind_param($stmtItem, "iisdsi", $newOrderId, $item['p_id'], $item['p_name'], $img, $item['p_price'], $item['quantity']);
+                        mysqli_stmt_bind_param($stmtItem, "iisssdi", $newOrderId, $item['p_id'], $item['p_name'], $color, $img, $item['p_price'], $item['quantity']);
                         mysqli_stmt_execute($stmtItem);
                         mysqli_stmt_close($stmtItem);
                     }

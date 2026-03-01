@@ -14,7 +14,6 @@ $isLoggedIn = true;
 $isAdmin = isset($_SESSION['admin_id']) ? true : false;
 $u_id = $_SESSION['u_id'];
 $profileImage = "https://ui-avatars.com/api/?name=User&background=F43F85&color=fff";
-$userData = ['u_username' => 'User'];
 
 $sql = "SELECT a.u_username, a.u_email, u.u_image FROM `account` a LEFT JOIN `user` u ON a.u_id = u.u_id WHERE a.u_id = ?";
 if ($stmt = mysqli_prepare($conn, $sql)) {
@@ -22,11 +21,8 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
     if ($row = mysqli_fetch_assoc($result)) {
-        $userData = $row;
-        if (!empty($row['u_image']) && file_exists("../profile/uploads/" . $row['u_image'])) {
+        if (!empty($row['u_image'])) {
             $profileImage = "../profile/uploads/" . $row['u_image'];
-        } else {
-            $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($row['u_username']) . "&background=F43F85&color=fff";
         }
     }
     mysqli_stmt_close($stmt);
@@ -61,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         header("Location: orders_detail.php?id=" . $target_order_id);
         exit();
     }
-    
     if ($_POST['action'] === 'refund_order') {
         $_SESSION['toast_msg'] = "ส่งคำขอคืนเงินสำเร็จ ทีมงานจะติดต่อกลับภายใน 24 ชม.";
         header("Location: orders_detail.php?id=" . $target_order_id);
@@ -87,15 +82,14 @@ if ($stmtOrder = mysqli_prepare($conn, $sqlOrder)) {
     $order = mysqli_fetch_assoc($resOrder);
     mysqli_stmt_close($stmtOrder);
 }
-
 if (!$order) {
     header("Location: orders.php");
     exit();
 }
 
-// ดึงที่อยู่จัดส่ง (ถ้าในบิลไม่มี ให้ดึงจากข้อมูล Profile ปกติ)
-$displayAddress = isset($order['shipping_address']) && !empty(trim($order['shipping_address'])) ? $order['shipping_address'] : '';
-if (empty($displayAddress)) {
+// ดึงที่อยู่จัดส่ง
+$displayAddress = $order['shipping_address'] ?? '';
+if (empty(trim($displayAddress))) {
     $sqlFallback = "SELECT * FROM user_address WHERE u_id = ? ORDER BY is_default DESC LIMIT 1";
     if($stmtFB = mysqli_prepare($conn, $sqlFallback)) {
         mysqli_stmt_bind_param($stmtFB, "i", $u_id);
@@ -111,7 +105,7 @@ if (empty($displayAddress)) {
     }
 }
 
-// ดึงรายการสินค้า พร้อมหมวดหมู่ (Category) และดึงรูปจาก Product ปกติมาสำรองด้วย
+// 🟢 ดึงรายการสินค้า พร้อมหมวดหมู่ (Category) และดึงรูปจาก Product ปกติมาสำรองด้วย
 $items = [];
 $subtotal = 0;
 $sqlItems = "SELECT oi.*, p.p_image as real_p_image, c.c_name 
@@ -137,10 +131,10 @@ $thai_months = ["", "มกราคม", "กุมภาพันธ์", "ม
 $time = strtotime($order['created_at']);
 $formatted_date = date('d', $time) . ' ' . $thai_months[date('n', $time)] . ' ' . (date('Y', $time) + 543) . ' • ' . date('H:i', $time) . ' น.';
 
-// 🟢 สร้างเลขพัสดุแบบสุ่ม 1 ครั้ง (ล็อกค่าตาม Order ID ทำให้เลขไม่เปลี่ยนเวลาย้อนกลับมาดู)
-srand($order_id + 9999); 
-$trackingNo = 'TH' . rand(1000000000, 9999999999) . 'TH';
-srand(); // รีเซ็ต Seed คืนค่าปกติเพื่อไม่ให้กระทบฟังก์ชันอื่น
+// 🟢 สร้างเลขพัสดุแบบสุ่ม 1 ครั้ง (ล็อกค่าตาม Order ID)
+mt_srand($order_id * 999); 
+$trackingNo = 'TH' . mt_rand(1000000000, 9999999999) . 'TH';
+mt_srand(); 
 
 function getStatusBadge($status) {
     switch($status) {
@@ -158,7 +152,7 @@ function getPaymentMethodName($method) {
     $method = strtolower(trim($method ?? ''));
     if ($method == 'credit_card') return 'บัตรเครดิต / เดบิต';
     if ($method == 'cod') return 'ชำระเงินปลายทาง (COD)';
-    return 'พร้อมเพย์ / โอนผ่านบัญชีธนาคาร'; // ครอบคลุมค่าว่าง หรือ '0' ที่ผิดพลาด
+    return 'พร้อมเพย์ / โอนผ่านบัญชีธนาคาร'; 
 }
 function getPaymentMethodIcon($method) {
     $method = strtolower(trim($method ?? ''));
@@ -202,8 +196,6 @@ function getPaymentMethodIcon($method) {
         .dark .glass-panel { background: rgba(45, 38, 53, 0.7); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* แอนิเมชันก้อนเมฆจากหน้า Home */
         .cloud-gradient {
             background: radial-gradient(circle at 10% 20%, rgba(244, 63, 133, 0.05) 0%, transparent 30%),
                         radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.05) 0%, transparent 30%);
@@ -250,19 +242,19 @@ function getPaymentMethodIcon($method) {
 
 <main class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
     
-    <div class="flex flex-col mb-6 gap-2">
-        <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
-            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
+    <div class="flex flex-col mb-6 gap-3">
+        <a href="orders.php" class="inline-flex items-center gap-1 text-sm font-bold text-gray-500 hover:text-primary transition w-fit">
+            <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับไปประวัติการสั่งซื้อ
         </a>
-        <div class="mt-2">
-            <div class="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
+        <div>
+            <div class="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <a href="account.php" class="hover:text-primary transition">บัญชีของฉัน</a>
                 <span class="material-icons-round text-[14px]">chevron_right</span>
                 <a href="orders.php" class="hover:text-primary transition">ประวัติการสั่งซื้อ</a>
                 <span class="material-icons-round text-[14px]">chevron_right</span>
                 <span class="text-primary font-bold">รายละเอียด</span>
             </div>
-            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">คำสั่งซื้อ #<?= htmlspecialchars($order['order_no']) ?></h1>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">คำสั่งซื้อ #<?= htmlspecialchars($order['order_no']) ?></h1>
             <p class="text-gray-500 dark:text-gray-400 text-sm">สั่งซื้อเมื่อ <?= $formatted_date ?></p>
         </div>
     </div>
@@ -289,25 +281,25 @@ function getPaymentMethodIcon($method) {
         
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white dark:bg-gray-800 rounded-[2rem] shadow-soft border border-pink-50 dark:border-gray-700 p-6 sm:p-8">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-6 border-b border-gray-100 dark:border-gray-700 pb-4">รายการสินค้า (<?= count($items) ?> รายการ)</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2 border-b border-gray-100 dark:border-gray-700 pb-4">รายการสินค้า (<?= count($items) ?> รายการ)</h3>
                 
-                <div class="space-y-6">
+                <div class="space-y-0">
                     <?php foreach ($items as $item): 
-                        // แก้ปัญหารูปภาพไม่ขึ้น ถ้าใน order_items พัง ให้ไปดึงจาก product table แทน (real_p_image)
+                        // 🟢 แก้ที่ 1: ดึงรูปภาพจาก DB ตรงๆ โดยไม่ต้องเช็ค path
                         $imgName = (!empty($item['p_image']) && $item['p_image'] !== '0') ? $item['p_image'] : $item['real_p_image'];
                         $imgUrl = (!empty($imgName)) ? "../uploads/products/" . $imgName : "https://via.placeholder.com/150";
                     ?>
-                        <div class="flex gap-4 items-start sm:items-center">
-                            <div class="w-24 h-24 rounded-2xl bg-gray-50 dark:bg-gray-700 overflow-hidden flex-shrink-0 border border-gray-100 dark:border-gray-600 relative p-1">
-                                <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover rounded-xl">
+                        <div class="flex gap-4 items-start sm:items-center py-5 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                            <div class="w-20 h-20 rounded-3xl bg-white border border-gray-200 dark:border-gray-600 overflow-hidden flex-shrink-0 p-1 shadow-sm">
+                                <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover rounded-2xl">
                             </div>
+                            
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-bold text-gray-800 dark:text-white text-base leading-tight mb-1"><?= htmlspecialchars($item['p_name']) ?></h4>
+                                <h4 class="font-bold text-gray-900 dark:text-white text-sm md:text-base leading-tight mb-1"><?= htmlspecialchars($item['p_name']) ?></h4>
                                 
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1.5">หมวดหมู่: <?= htmlspecialchars($item['c_name'] ?? 'ไม่ระบุหมวดหมู่') ?></p>
-                                
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">หมวดหมู่: <?= htmlspecialchars($item['c_name'] ?? 'ไม่ระบุ') ?></p>
                                 <?php if (!empty($item['selected_color'])): ?>
-                                    <p class="text-[11px] font-bold text-primary bg-pink-50 dark:bg-gray-700 w-fit px-2 py-0.5 rounded-md border border-pink-100 dark:border-gray-600">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
                                 <?php endif; ?>
                                 
                                 <div class="flex justify-between items-end mt-2">
@@ -332,18 +324,16 @@ function getPaymentMethodIcon($method) {
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">หมายเลขพัสดุ: <?= in_array($order['status'], ['shipped', 'completed']) ? "<span class='font-bold text-gray-800 dark:text-white'>".$trackingNo."</span>" : "รอการอัปเดต" ?></p>
                     
                     <div class="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
-                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">ที่อยู่จัดส่ง</p>
+                        <p class="text-xs font-bold text-gray-500 mb-1">ที่อยู่จัดส่ง</p>
                         <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed"><?= htmlspecialchars($displayAddress) ?></p>
                     </div>
                 </div>
             </div>
 
             <div class="bg-white dark:bg-gray-800 rounded-[2rem] shadow-soft border border-pink-50 dark:border-gray-700 p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <span class="material-icons-round text-primary text-xl">account_balance_wallet</span> วิธีชำระเงิน
-                    </h3>
-                </div>
+                <h3 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <span class="material-icons-round text-primary text-xl">account_balance_wallet</span> วิธีชำระเงิน
+                </h3>
                 
                 <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-100 dark:border-gray-600 flex items-center gap-3">
                     <span class="material-icons-round text-gray-400">
@@ -386,9 +376,10 @@ function getPaymentMethodIcon($method) {
                     </div>
                 </div>
 
-                <div class="space-y-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+                <div class="space-y-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-700 flex flex-col w-full">
+                    
                     <?php if (in_array($order['status'], ['pending', 'processing'])): ?>
-                        <form action="" method="POST" id="cancelForm">
+                        <form action="" method="POST" id="cancelForm" class="w-full m-0">
                             <input type="hidden" name="action" value="cancel_order">
                             <input type="hidden" name="order_id" value="<?= $order_id ?>">
                             <button type="button" onclick="confirmCancel()" class="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-white dark:bg-gray-800 border-2 border-red-500 text-red-500 rounded-xl font-bold hover:bg-red-50 dark:hover:bg-red-900/20 transition shadow-sm">
@@ -396,7 +387,7 @@ function getPaymentMethodIcon($method) {
                             </button>
                         </form>
                     <?php elseif ($order['status'] === 'completed'): ?>
-                        <form action="" method="POST" id="refundForm">
+                        <form action="" method="POST" id="refundForm" class="w-full m-0">
                             <input type="hidden" name="action" value="refund_order">
                             <input type="hidden" name="order_id" value="<?= $order_id ?>">
                             <button type="button" onclick="confirmRefund()" class="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-white dark:bg-gray-800 border-2 border-orange-500 text-orange-500 rounded-xl font-bold hover:bg-orange-50 dark:hover:bg-orange-900/20 transition shadow-sm">
@@ -405,7 +396,7 @@ function getPaymentMethodIcon($method) {
                         </form>
                     <?php endif; ?>
 
-                    <a href="../auth/contact.php" class="flex items-center justify-center gap-2 w-full px-6 py-3.5 bg-primary text-white rounded-xl font-bold hover:bg-pink-600 transition shadow-sm">
+                    <a href="../auth/contact.php" class="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-primary text-white rounded-xl font-bold hover:bg-pink-600 transition shadow-sm">
                         <span class="material-icons-round text-[20px]">support_agent</span> ติดต่อ Admin
                     </a>
                 </div>
