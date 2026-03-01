@@ -14,6 +14,7 @@ $isLoggedIn = true;
 $isAdmin = isset($_SESSION['admin_id']) ? true : false;
 $u_id = $_SESSION['u_id'];
 $profileImage = "https://ui-avatars.com/api/?name=User&background=F43F85&color=fff";
+$userData = ['u_username' => 'User'];
 
 $sql = "SELECT a.u_username, a.u_email, u.u_image FROM `account` a LEFT JOIN `user` u ON a.u_id = u.u_id WHERE a.u_id = ?";
 if ($stmt = mysqli_prepare($conn, $sql)) {
@@ -21,8 +22,11 @@ if ($stmt = mysqli_prepare($conn, $sql)) {
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
     if ($row = mysqli_fetch_assoc($result)) {
-        if (!empty($row['u_image'])) {
+        $userData = $row;
+        if (!empty($row['u_image']) && file_exists("../profile/uploads/" . $row['u_image'])) {
             $profileImage = "../profile/uploads/" . $row['u_image'];
+        } else {
+            $profileImage = "https://ui-avatars.com/api/?name=" . urlencode($row['u_username']) . "&background=F43F85&color=fff";
         }
     }
     mysqli_stmt_close($stmt);
@@ -57,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         header("Location: orders_detail.php?id=" . $target_order_id);
         exit();
     }
+    
     if ($_POST['action'] === 'refund_order') {
         $_SESSION['toast_msg'] = "ส่งคำขอคืนเงินสำเร็จ ทีมงานจะติดต่อกลับภายใน 24 ชม.";
         header("Location: orders_detail.php?id=" . $target_order_id);
@@ -82,14 +87,15 @@ if ($stmtOrder = mysqli_prepare($conn, $sqlOrder)) {
     $order = mysqli_fetch_assoc($resOrder);
     mysqli_stmt_close($stmtOrder);
 }
+
 if (!$order) {
     header("Location: orders.php");
     exit();
 }
 
-// ดึงที่อยู่จัดส่ง
-$displayAddress = $order['shipping_address'] ?? '';
-if (empty(trim($displayAddress))) {
+// ดึงที่อยู่จัดส่ง (ถ้าในบิลไม่มี ให้ดึงจากข้อมูล Profile ปกติมาสำรอง)
+$displayAddress = isset($order['shipping_address']) && !empty(trim($order['shipping_address'])) ? $order['shipping_address'] : '';
+if (empty($displayAddress)) {
     $sqlFallback = "SELECT * FROM user_address WHERE u_id = ? ORDER BY is_default DESC LIMIT 1";
     if($stmtFB = mysqli_prepare($conn, $sqlFallback)) {
         mysqli_stmt_bind_param($stmtFB, "i", $u_id);
@@ -105,7 +111,7 @@ if (empty(trim($displayAddress))) {
     }
 }
 
-// 🟢 ดึงรายการสินค้า พร้อมหมวดหมู่ (Category) และดึงรูปจาก Product ปกติมาสำรองด้วย
+// ดึงรายการสินค้า พร้อมหมวดหมู่ (Category) และดึงรูปจาก Product ปกติมาสำรองด้วย
 $items = [];
 $subtotal = 0;
 $sqlItems = "SELECT oi.*, p.p_image as real_p_image, c.c_name 
@@ -131,10 +137,10 @@ $thai_months = ["", "มกราคม", "กุมภาพันธ์", "ม
 $time = strtotime($order['created_at']);
 $formatted_date = date('d', $time) . ' ' . $thai_months[date('n', $time)] . ' ' . (date('Y', $time) + 543) . ' • ' . date('H:i', $time) . ' น.';
 
-// 🟢 สร้างเลขพัสดุแบบสุ่ม 1 ครั้ง (ล็อกค่าตาม Order ID)
+// 🟢 สร้างเลขพัสดุแบบสุ่ม 1 ครั้ง (ล็อกค่าตาม Order ID ทำให้เลขไม่เปลี่ยนเวลาย้อนกลับมาดู)
 mt_srand($order_id * 999); 
 $trackingNo = 'TH' . mt_rand(1000000000, 9999999999) . 'TH';
-mt_srand(); 
+mt_srand(); // รีเซ็ต Seed คืนค่าปกติเพื่อไม่ให้กระทบฟังก์ชันอื่น
 
 function getStatusBadge($status) {
     switch($status) {
@@ -152,7 +158,7 @@ function getPaymentMethodName($method) {
     $method = strtolower(trim($method ?? ''));
     if ($method == 'credit_card') return 'บัตรเครดิต / เดบิต';
     if ($method == 'cod') return 'ชำระเงินปลายทาง (COD)';
-    return 'พร้อมเพย์ / โอนผ่านบัญชีธนาคาร'; 
+    return 'พร้อมเพย์ / โอนผ่านบัญชีธนาคาร'; // ครอบคลุมค่าว่าง หรือ '0' ที่ผิดพลาดของบิลเก่า
 }
 function getPaymentMethodIcon($method) {
     $method = strtolower(trim($method ?? ''));
@@ -196,6 +202,8 @@ function getPaymentMethodIcon($method) {
         .dark .glass-panel { background: rgba(45, 38, 53, 0.7); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* แอนิเมชันก้อนเมฆจากหน้า Home */
         .cloud-gradient {
             background: radial-gradient(circle at 10% 20%, rgba(244, 63, 133, 0.05) 0%, transparent 30%),
                         radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.05) 0%, transparent 30%);
@@ -285,9 +293,15 @@ function getPaymentMethodIcon($method) {
                 
                 <div class="space-y-0">
                     <?php foreach ($items as $item): 
-                        // 🟢 แก้ที่ 1: ดึงรูปภาพจาก DB ตรงๆ โดยไม่ต้องเช็ค path
-                        $imgName = (!empty($item['p_image']) && $item['p_image'] !== '0') ? $item['p_image'] : $item['real_p_image'];
-                        $imgUrl = (!empty($imgName)) ? "../uploads/products/" . $imgName : "https://via.placeholder.com/150";
+                        // 🟢 แก้ที่ 1: ดึงรูปภาพ โดยใช้ file_exists เช็คเหมือน cart.php เป๊ะๆ 🟢
+                        // ดักจับถ้า p_image เป็น 0 ให้ไปเอา real_p_image มาแทน
+                        $imgName = (!empty($item['p_image']) && $item['p_image'] !== '0') ? $item['p_image'] : ($item['real_p_image'] ?? '');
+                        
+                        if (!empty($imgName) && file_exists("../uploads/products/" . $imgName)) {
+                            $imgUrl = "../uploads/products/" . $imgName;
+                        } else {
+                            $imgUrl = "https://via.placeholder.com/400x400.png?text=No+Image";
+                        }
                     ?>
                         <div class="flex gap-4 items-start sm:items-center py-5 border-b border-gray-100 dark:border-gray-700 last:border-0">
                             <div class="w-20 h-20 rounded-3xl bg-white border border-gray-200 dark:border-gray-600 overflow-hidden flex-shrink-0 p-1 shadow-sm">
@@ -298,6 +312,7 @@ function getPaymentMethodIcon($method) {
                                 <h4 class="font-bold text-gray-900 dark:text-white text-sm md:text-base leading-tight mb-1"><?= htmlspecialchars($item['p_name']) ?></h4>
                                 
                                 <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">หมวดหมู่: <?= htmlspecialchars($item['c_name'] ?? 'ไม่ระบุ') ?></p>
+                                
                                 <?php if (!empty($item['selected_color'])): ?>
                                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5">สี: <?= htmlspecialchars($item['selected_color']) ?></p>
                                 <?php endif; ?>
