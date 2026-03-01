@@ -323,7 +323,7 @@ if($resFeat) {
 </div>
 </div>
 <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-auto z-20">
-<img alt="Premium Cosmetic Products" class="rounded-3xl shadow-2xl rotate-3 border-4 border-white dark:border-gray-700" src="https://via.placeholder.com/400x500.png?text=Cosmetic+Product"/>
+<img alt="Logo LuminaBeauty" class="rounded-3xl shadow-2xl rotate-3 border-4 border-white dark:border-gray-700" src="logo.jpg"/>
 </div>
 <div class="absolute bottom-20 right-10 animate-bounce" style="animation-duration: 4s;">
 <div class="bg-pink-100 dark:bg-gray-600 w-28 h-20 rounded-full shadow-lg flex items-center justify-center relative opacity-90">
