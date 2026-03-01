@@ -30,7 +30,7 @@ if (isset($_SESSION['admin_id'])) {
         if ($row = mysqli_fetch_assoc($result)) {
             $userData['u_username'] = $row['admin_username'];
             $userData['u_email'] = 'Administrator Mode'; // เปลี่ยนอีเมลเป็นคำว่า Admin
-            $profileImage = "/admin/admin.jpg/";
+            $profileImage = "admin/admin.jpg";
         }
         mysqli_stmt_close($stmt);
     }
