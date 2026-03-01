@@ -214,10 +214,6 @@ while($c = mysqli_fetch_assoc($resAllCat)) { $categories_list[] = $c; }
                         </div>
                     </div>
                 </div>
-                <a class="group flex flex-col items-center justify-center transition" href="promotions.php">
-                    <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">โปรโมชั่น</span>
-                    <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary">(Sale)</span>
-                </a>
                 <a class="group flex flex-col items-center justify-center transition" href="../contact.php">
                     <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">ติดต่อเรา</span>
                     <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary">(Contact)</span>
