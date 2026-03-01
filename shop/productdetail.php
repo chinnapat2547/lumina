@@ -126,6 +126,23 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
     }
     mysqli_stmt_close($stmtRec);
 }
+
+// ==========================================
+// 6. เช็คสถานะถูกใจสินค้าของลูกค้ารายนี้
+// ==========================================
+$isFavorited = false;
+if ($isLoggedIn) {
+    $sqlCheckFav = "SELECT fav_id FROM `favorites` WHERE u_id = ? AND p_id = ?";
+    if ($stmtCheckFav = mysqli_prepare($conn, $sqlCheckFav)) {
+        mysqli_stmt_bind_param($stmtCheckFav, "ii", $u_id, $p_id);
+        mysqli_stmt_execute($stmtCheckFav);
+        mysqli_stmt_store_result($stmtCheckFav);
+        if (mysqli_stmt_num_rows($stmtCheckFav) > 0) {
+            $isFavorited = true;
+        }
+        mysqli_stmt_close($stmtCheckFav);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="th"><head>
@@ -418,8 +435,8 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                         </button>
                         <?php endif; ?>
                         
-                        <button type="button" onclick="addToFavAjax()" class="w-[60px] h-[60px] sm:w-[60px] sm:flex-none flex-shrink-0 rounded-full border-2 border-gray-200 dark:border-gray-600 text-gray-400 hover:text-primary hover:border-primary hover:bg-pink-50 transition-all duration-300 flex items-center justify-center group bg-white dark:bg-gray-800 shadow-sm" title="เพิ่มลงสิ่งที่ถูกใจ">
-                            <span class="material-icons-round text-[26px] group-hover:scale-110 transition-transform">favorite_border</span>
+                        <button type="button" onclick="toggleFavAjax()" id="fav-btn" class="w-[60px] h-[60px] sm:w-[60px] sm:flex-none flex-shrink-0 rounded-full border-2 transition-all duration-300 flex items-center justify-center group shadow-sm <?= $isFavorited ? 'border-primary bg-pink-50 text-primary' : 'border-gray-200 dark:border-gray-600 text-gray-400 bg-white dark:bg-gray-800' ?> hover:text-primary hover:border-primary hover:bg-pink-50" title="ถูกใจสินค้า">
+                            <span id="fav-icon" class="material-icons-round text-[26px] group-hover:scale-110 transition-transform"><?= $isFavorited ? 'favorite' : 'favorite_border' ?></span>
                         </button>
                     </div>
                 </form>
@@ -689,29 +706,43 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
         });
     }
 
-    function addToFavAjax() {
+    function toggleFavAjax() {
         if(!isLoggedIn) {
             window.location.href = '../auth/login.php';
             return;
         }
         
+        const favBtn = document.getElementById('fav-btn');
+        const favIcon = document.getElementById('fav-icon');
+        const isCurrentlyFav = favIcon.innerText === 'favorite';
+
+        // 1. เปลี่ยน UI ทันทีที่กด (สลับสี / สลับไอคอนทึบ-โปร่ง)
+        if (isCurrentlyFav) {
+            // ยกเลิกถูกใจ -> เปลี่ยนเป็นสีเทา
+            favIcon.innerText = 'favorite_border';
+            favBtn.classList.remove('border-primary', 'bg-pink-50', 'text-primary');
+            favBtn.classList.add('border-gray-200', 'dark:border-gray-600', 'text-gray-400', 'bg-white', 'dark:bg-gray-800');
+        } else {
+            // กดถูกใจ -> เปลี่ยนเป็นสีชมพูและเด้งแอนิเมชัน
+            flyToIcon('nav-fav-icon');
+            favIcon.innerText = 'favorite';
+            favBtn.classList.remove('border-gray-200', 'dark:border-gray-600', 'text-gray-400', 'bg-white', 'dark:bg-gray-800');
+            favBtn.classList.add('border-primary', 'bg-pink-50', 'text-primary');
+            
+            // อัปเดตไอคอนหัวใจที่ Navbar ด้านบน
+            const navHeart = document.querySelector('#nav-fav-icon span');
+            setTimeout(() => { navHeart.innerText = 'favorite'; navHeart.classList.add('text-primary'); }, 800);
+        }
+
+        // 2. ส่งข้อมูลไปประมวลผลเบื้องหลัง
         const formData = new FormData();
-        formData.append('action', 'add_fav');
+        formData.append('action', 'toggle_fav');
         formData.append('p_id', '<?= $p_id ?>');
 
         fetch('favorites.php', {
             method: 'POST',
             body: formData
-        }).then(response => {
-            if(response.ok) {
-                flyToIcon('nav-fav-icon');
-                const heartIcon = document.querySelector('#nav-fav-icon span');
-                setTimeout(() => {
-                    heartIcon.innerText = 'favorite'; // เปลี่ยนเป็นหัวใจทึบ
-                    heartIcon.classList.add('text-primary');
-                }, 800);
-            }
-        });
+        }); // จบแค่นี้ ไม่ต้องมี .then() เพื่อแจ้งเตือน
     }
 </script>
 </body>
