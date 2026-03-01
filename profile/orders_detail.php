@@ -280,11 +280,11 @@ function getPaymentMethodIcon($method) {
                 ?>
             </p>
         </div>
-            <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
-                <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
-            </a>
     </div>
-    
+    <a href="orders.php" class="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition shadow-sm w-fit">
+        <span class="material-icons-round text-[18px]">arrow_back</span> ย้อนกลับ
+    </a>
+</div>  
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
