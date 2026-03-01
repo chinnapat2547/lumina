@@ -9,6 +9,7 @@ $isLoggedIn = false;
 $profileImage = "https://ui-avatars.com/api/?name=Guest&background=E5E7EB&color=9CA3AF"; 
 $userData = ['u_username' => 'ผู้เยี่ยมชม', 'u_email' => 'กรุณาเข้าสู่ระบบ'];
 $totalCartItems = 0;
+$isAdmin = isset($_SESSION['admin_id']) ? true : false;
 
 if (isset($_SESSION['u_id'])) {
     $isLoggedIn = true;
@@ -49,14 +50,12 @@ if (isset($_SESSION['u_id'])) {
 // ==========================================
 $p_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// ถ้าไม่มี ID ให้เด้งกลับไปหน้าสินค้าทั้งหมด
 if ($p_id <= 0) {
     header("Location: products.php");
     exit();
 }
 
 $product = null;
-// ดึงข้อมูลสินค้าพร้อมชื่อหมวดหมู่
 $sqlProduct = "SELECT p.*, c.c_name as p_category FROM `product` p LEFT JOIN `category` c ON p.c_id = c.c_id WHERE p.p_id = ?";
 if ($stmt = mysqli_prepare($conn, $sqlProduct)) {
     mysqli_stmt_bind_param($stmt, "i", $p_id);
@@ -66,7 +65,6 @@ if ($stmt = mysqli_prepare($conn, $sqlProduct)) {
     mysqli_stmt_close($stmt);
 }
 
-// ถ้าหาสินค้าไม่เจอ เด้งกลับ
 if (!$product) {
     header("Location: products.php");
     exit();
@@ -76,20 +74,17 @@ if (!$product) {
 // 3. ดึงรูปภาพแกลเลอรีของสินค้านี้
 // ==========================================
 $images = [];
-// เอารูปหลัก (จากตาราง product) มาใส่เป็นรูปแรกก่อน
 $mainImg = (!empty($product['p_image']) && file_exists("../uploads/products/" . $product['p_image'])) 
             ? "../uploads/products/" . $product['p_image'] 
             : "https://via.placeholder.com/600x600.png?text=No+Image";
 $images[] = $mainImg;
 
-// ดึงรูปเพิ่มเติมจากตาราง product_images
 $sqlImages = "SELECT image_url FROM `product_images` WHERE p_id = ?";
 if ($stmtImg = mysqli_prepare($conn, $sqlImages)) {
     mysqli_stmt_bind_param($stmtImg, "i", $p_id);
     mysqli_stmt_execute($stmtImg);
     $resultImg = mysqli_stmt_get_result($stmtImg);
     while ($rowImg = mysqli_fetch_assoc($resultImg)) {
-        // อิงจากโครงสร้างตารางที่คุณให้มา ใช้ image_url
         $imgPath = "../uploads/products/" . $rowImg['image_url'];
         if (file_exists($imgPath) && $imgPath !== $mainImg) {
             $images[] = $imgPath;
@@ -99,7 +94,7 @@ if ($stmtImg = mysqli_prepare($conn, $sqlImages)) {
 }
 
 // ==========================================
-// NEW: ดึงข้อมูลสีของสินค้า (ตาราง product_colors)
+// 4. ดึงข้อมูลสีของสินค้า
 // ==========================================
 $colors = [];
 $sqlColors = "SELECT color_name, color_hex FROM `product_colors` WHERE p_id = ?";
@@ -114,7 +109,7 @@ if ($stmtCol = mysqli_prepare($conn, $sqlColors)) {
 }
 
 // ==========================================
-// 4. ดึงสินค้าแนะนำ (สุ่มมา 4 รายการ)
+// 5. ดึงสินค้าแนะนำ (สุ่มมา 4 รายการ)
 // ==========================================
 $recommended = [];
 $sqlRec = "SELECT p_id, p_name, p_price, p_image, p_detail FROM `product` WHERE p_id != ? AND status = 1 ORDER BY RAND() LIMIT 4";
@@ -151,9 +146,6 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
               "surface-dark": "#2D2635",
               "text-light": "#374151",
               "text-dark": "#E5E7EB",
-              "pastel-pink": "#FFE4E6",
-              "pastel-blue": "#E0E7FF",
-              "pastel-purple": "#F3E8FF",
             },
             fontFamily: {
               display: ["Prompt", "sans-serif"],
@@ -174,85 +166,136 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
         body { font-family: 'Prompt', sans-serif; }
         
         .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(244, 63, 133, 0.1);
         }
         .dark .glass-panel {
-            background: rgba(45, 38, 53, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(31, 27, 36, 0.85);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* สไตล์เอาลูกศรตัวเลขใน input ออก */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
           -webkit-appearance: none; margin: 0; 
         }
-        
-        /* สไตล์สำหรับปุ่ม Tab ที่ถูกเลือก */
-        .tab-active {
-            background-color: #F43F85;
-            color: white;
-            box-shadow: 0 4px 14px rgba(244, 63, 133, 0.3);
-        }
-        .tab-inactive {
-            color: #6b7280;
-            background-color: transparent;
-        }
-        .dark .tab-inactive {
-            color: #9ca3af;
+
+        /* สำหรับแอนิเมชันลอยเข้าตะกร้า */
+        .flying-img {
+            position: fixed;
+            z-index: 9999;
+            border-radius: 50%;
+            opacity: 0.8;
+            transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+            pointer-events: none;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 via-white to-pink-50 dark:from-background-dark dark:to-gray-900 min-h-screen text-gray-800 dark:text-gray-100 font-display transition-colors duration-300">
 
-<header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-8 relative z-50">
+<header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-8 relative">
     <div class="w-full px-4 md:px-10 lg:px-16"> 
         <div class="flex justify-between items-center h-10 w-full">
-        <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
-            <span class="material-icons-round text-primary text-4xl">spa</span>
-            <span class="font-bold text-2xl tracking-tight text-primary font-display">Lumina</span>
-        </a>
-        <div class="flex items-center space-x-2 sm:space-x-4">
+            <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
+                <span class="material-icons-round text-primary text-4xl">spa</span>
+                <span class="font-bold text-2xl tracking-tight text-primary font-display">Lumina</span>
+            </a>
             
-            <div class="hidden md:flex items-center relative mr-2">
-                <form action="products.php" method="GET">
-                    <input type="text" name="search" placeholder="ค้นหาสินค้า..." class="pl-10 pr-4 py-2 bg-pink-50 dark:bg-gray-800 border-none rounded-full text-sm focus:ring-2 focus:ring-primary w-48 lg:w-64 transition-all placeholder-gray-400 dark:text-white outline-none">
-                    <button type="submit" class="material-icons-round absolute left-3 top-2 text-gray-400 text-lg">search</button>
-                </form>
+            <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-10">
+                <a class="group flex flex-col items-center justify-center transition" href="products.php">
+                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">สินค้า</span>
+                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Shop)</span>
+                </a>
+                <div class="relative group">
+                    <button class="flex flex-col items-center justify-center transition pb-1 pt-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">หมวดหมู่</span>
+                            <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
+                        </div>
+                        <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Categories)</span>
+                    </button>
+                </div>
+                <a class="group flex flex-col items-center justify-center transition" href="promotions.php">
+                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">โปรโมชั่น</span>
+                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Sale)</span>
+                </a>
+                <a class="group flex flex-col items-center justify-center transition" href="../contact.php">
+                    <span class="text-[16px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">ติดต่อเรา</span>
+                    <span class="text-[12px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Contact)</span>
+                </a>
             </div>
 
-            <a href="favorites.php" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center">
-                <span class="material-icons-round text-2xl">favorite_border</span>
-            </a>
-            <a href="cart.php" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
-                <span class="material-icons-round text-2xl">shopping_bag</span>
-                <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800"><?= $totalCartItems ?></span>
-            </a>
-            <button class="w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all" onclick="toggleTheme()">
-                <span class="material-icons-round dark:hidden text-2xl">dark_mode</span>
-                <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
-            </button>
-            
-            <div class="relative group flex items-center">
-                <a href="../profile/account.php" class="block w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
-                    <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                        <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=F43F85&color=fff'"/>
-                    </div>
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                <a href="favorites.php" id="nav-fav-icon" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center">
+                    <span class="material-icons-round text-2xl transition-transform duration-300">favorite_border</span>
                 </a>
+                <a href="cart.php" id="nav-cart-icon" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
+                    <span class="material-icons-round text-2xl transition-transform duration-300">shopping_bag</span>
+                    <span id="cart-badge" class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800 transition-transform duration-300"><?= $totalCartItems ?></span>
+                </a>
+                <button class="w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all" onclick="toggleTheme()">
+                    <span class="material-icons-round dark:hidden text-2xl">dark_mode</span>
+                    <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
+                </button>
+                
+                <div class="relative group flex items-center">
+                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : '../profile/account.php' ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                        <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
+                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>" onerror="this.src='https://ui-avatars.com/api/?name=User&background=ec2d88&color=fff'"/>
+                        </div>
+                    </a>
+                    
+                    <?php if($isLoggedIn): ?>
+                    <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
+                        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
+                            <div class="text-center mb-4">
+                                <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
+                                    <?= $isAdmin ? 'Administrator Mode' : htmlspecialchars($userData['u_email'] ?? '') ?>
+                                </span>
+                            </div>
+                            <div class="flex justify-center relative mb-4">
+                                <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
+                                    <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
+                                        <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center mt-2 mb-6">
+                                <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username'] ?? 'User') ?></h3>
+                            </div>
+                            <div class="flex flex-col gap-3 mt-2">
+                                <?php if($isAdmin): ?>
+                                    <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                        <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+                                    </a>
+                                <?php else: ?>
+                                    <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                        จัดการบัญชี
+                                    </a>
+                                <?php endif; ?>
+                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
 </header>
+
 <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-    <nav class="flex items-center justify-center mb-10 text-sm text-gray-500 dark:text-gray-400">
+    <nav class="flex items-center justify-start mb-10 text-sm text-gray-500 dark:text-gray-400">
         <a class="hover:text-primary transition-colors" href="../home.php">หน้าหลัก</a>
-        <span class="mx-3 material-icons-round text-[16px]">chevron_right</span>
+        <span class="mx-2 material-icons-round text-[16px]">chevron_right</span>
         <a class="hover:text-primary transition-colors" href="products.php">สกินแคร์</a>
-        <span class="mx-3 material-icons-round text-[16px]">chevron_right</span>
+        <span class="mx-2 material-icons-round text-[16px]">chevron_right</span>
         <span class="text-primary font-bold truncate max-w-[200px]"><?= htmlspecialchars($product['p_name']) ?></span>
     </nav>
 
@@ -260,21 +303,31 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
             
             <div class="flex flex-col items-center relative">
-                <div class="absolute top-4 right-4 z-10">
+                <div class="absolute top-4 right-4 z-10 pointer-events-none">
                     <span class="bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-md tracking-wide uppercase">ขายดี</span>
                 </div>
                 
-                <div class="w-full max-w-[500px] aspect-square rounded-[2rem] overflow-hidden bg-pink-50 dark:bg-gray-700 flex items-center justify-center shadow-inner border border-gray-100 dark:border-gray-600">
-                    <img id="mainImage" alt="<?= htmlspecialchars($product['p_name']) ?>" class="w-full h-full object-cover transform hover:scale-105 transition duration-500 cursor-zoom-in" src="<?= htmlspecialchars($images[0]) ?>"/>
+                <div class="w-full max-w-[500px] aspect-square rounded-[2rem] overflow-hidden bg-pink-50 dark:bg-gray-700 flex items-center justify-center shadow-inner border border-gray-100 dark:border-gray-600 cursor-zoom-in" onclick="openLightbox()">
+                    <img id="mainImage" alt="<?= htmlspecialchars($product['p_name']) ?>" class="w-full h-full object-cover transform hover:scale-105 transition duration-500" src="<?= htmlspecialchars($images[0]) ?>"/>
                 </div>
                 
                 <?php if (count($images) > 1): ?>
-                <div class="flex gap-4 mt-6 justify-center overflow-x-auto hide-scrollbar pb-2 px-2 w-full max-w-[500px]">
-                    <?php foreach ($images as $index => $img): ?>
-                        <button type="button" onclick="changeMainImage(this, '<?= htmlspecialchars($img) ?>')" class="thumbnail-btn w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-[1.2rem] border-[3px] <?= $index == 0 ? 'border-primary shadow-md' : 'border-transparent hover:border-pink-300 opacity-60 hover:opacity-100' ?> overflow-hidden bg-white transition-all duration-300 p-0.5">
-                            <img alt="Thumbnail" class="w-full h-full object-cover rounded-xl" src="<?= htmlspecialchars($img) ?>"/>
-                        </button>
-                    <?php endforeach; ?>
+                <div class="relative w-full max-w-[500px] mt-6">
+                    <button onclick="scrollThumbs(-150)" class="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center bg-white/90 dark:bg-gray-800/90 rounded-full shadow border border-gray-100 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-primary transition-colors backdrop-blur-sm">
+                        <span class="material-icons-round text-[20px]">chevron_left</span>
+                    </button>
+                    
+                    <div id="thumb-container" class="flex gap-4 overflow-x-auto hide-scrollbar pb-2 px-10 scroll-smooth">
+                        <?php foreach ($images as $index => $img): ?>
+                            <button type="button" onclick="changeMainImage(this, '<?= htmlspecialchars($img) ?>', <?= $index ?>)" class="thumbnail-btn w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-[1.2rem] border-[3px] <?= $index == 0 ? 'border-primary shadow-md' : 'border-transparent hover:border-pink-300 opacity-60 hover:opacity-100' ?> overflow-hidden bg-white transition-all duration-300 p-0.5">
+                                <img alt="Thumbnail" class="w-full h-full object-cover rounded-xl" src="<?= htmlspecialchars($img) ?>"/>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <button onclick="scrollThumbs(150)" class="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center bg-white/90 dark:bg-gray-800/90 rounded-full shadow border border-gray-100 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:text-primary transition-colors backdrop-blur-sm">
+                        <span class="material-icons-round text-[20px]">chevron_right</span>
+                    </button>
                 </div>
                 <?php endif; ?>
             </div>
@@ -287,21 +340,9 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                     </h1>
                     <p class="text-gray-500 dark:text-gray-400 text-base mb-3 flex items-center gap-2">
                         <span class="material-icons-round text-[18px] text-pink-400">category</span>
-                        <?= htmlspecialchars($product['p_category'] ?? 'สินค้าทั่วไป') ?> | SKU: <?= htmlspecialchars($product['p_sku']) ?>
+                        <?= htmlspecialchars($product['p_category'] ?? 'สินค้าทั่วไป') ?> | SKU: <?= htmlspecialchars($product['p_sku'] ?: '-') ?>
                     </p>
-                    
-                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 w-fit px-4 py-2 rounded-full border border-gray-100 dark:border-gray-600">
-                        <div class="flex text-yellow-400">
-                            <span class="material-icons-round text-[18px]">star</span>
-                            <span class="material-icons-round text-[18px]">star</span>
-                            <span class="material-icons-round text-[18px]">star</span>
-                            <span class="material-icons-round text-[18px]">star</span>
-                            <span class="material-icons-round text-[18px]">star_half</span>
-                        </div>
-                        <span class="font-bold text-gray-800 dark:text-white ml-1">4.8/5</span> 
-                        <span class="text-gray-400">(รีวิว 128 คน)</span>
                     </div>
-                </div>
 
                 <div class="flex items-end gap-3 mb-8 pb-6 border-b border-gray-100 dark:border-gray-700">
                     <span class="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight">฿<?= number_format($product['p_price']) ?></span>
@@ -324,7 +365,7 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                     </ul>
                 </div>
 
-                <form action="cart.php" method="POST" class="mt-auto">
+                <form id="productForm" onsubmit="addToCartAjax(event)" class="mt-auto">
                     <input type="hidden" name="action" value="add">
                     <input type="hidden" name="p_id" value="<?= $p_id ?>">
                     
@@ -356,7 +397,7 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                                 <button type="button" onclick="adjustQty(-1)" class="w-10 h-10 rounded-full bg-white dark:bg-gray-600 shadow-sm flex items-center justify-center text-gray-600 dark:text-white hover:text-primary hover:bg-pink-50 transition-colors">
                                     <span class="material-icons-round text-[20px]">remove</span>
                                 </button>
-                                <input type="number" name="qty" id="qtyInput" value="1" min="1" max="<?= $product['p_stock'] > 0 ? $product['p_stock'] : 1 ?>" class="w-14 text-center font-bold text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0 text-lg">
+                                <input type="number" name="qty" id="qtyInput" value="1" min="1" max="<?= $product['p_stock'] > 0 ? $product['p_stock'] : 1 ?>" class="w-14 text-center font-bold text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0 text-lg pointer-events-none" readonly>
                                 <button type="button" onclick="adjustQty(1)" class="w-10 h-10 rounded-full bg-white dark:bg-gray-600 shadow-sm flex items-center justify-center text-gray-600 dark:text-white hover:text-primary hover:bg-pink-50 transition-colors">
                                     <span class="material-icons-round text-[20px]">add</span>
                                 </button>
@@ -364,7 +405,7 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                         </div>
 
                         <?php if($product['p_stock'] > 0): ?>
-                        <button type="submit" class="flex-1 w-full bg-primary hover:bg-pink-600 text-white font-bold py-4 px-8 rounded-full transition-all duration-300 transform hover:-translate-y-1 shadow-[0_8px_25px_-8px_rgba(244,63,133,0.6)] flex items-center justify-center gap-2 text-lg">
+                        <button type="submit" class="flex-1 w-full bg-primary hover:bg-pink-600 text-white font-bold py-4 px-8 rounded-full transition-all duration-300 transform hover:-translate-y-1 shadow-[0_8px_25px_-8px_rgba(244,63,133,0.6)] flex items-center justify-center gap-2 text-lg relative overflow-hidden">
                             <span class="material-icons-round">add_shopping_cart</span> เพิ่มลงตะกร้า
                         </button>
                         <?php else: ?>
@@ -373,15 +414,10 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
                         </button>
                         <?php endif; ?>
                         
-                        <button type="button" onclick="document.getElementById('favForm').submit();" class="w-[60px] h-[60px] sm:w-[60px] sm:flex-none flex-shrink-0 rounded-full border-2 border-gray-200 dark:border-gray-600 text-gray-400 hover:text-primary hover:border-primary hover:bg-pink-50 transition-all duration-300 flex items-center justify-center group bg-white dark:bg-gray-800 shadow-sm" title="เพิ่มลงสิ่งที่ถูกใจ">
+                        <button type="button" onclick="addToFavAjax()" class="w-[60px] h-[60px] sm:w-[60px] sm:flex-none flex-shrink-0 rounded-full border-2 border-gray-200 dark:border-gray-600 text-gray-400 hover:text-primary hover:border-primary hover:bg-pink-50 transition-all duration-300 flex items-center justify-center group bg-white dark:bg-gray-800 shadow-sm" title="เพิ่มลงสิ่งที่ถูกใจ">
                             <span class="material-icons-round text-[26px] group-hover:scale-110 transition-transform">favorite_border</span>
                         </button>
                     </div>
-                </form>
-
-                <form id="favForm" action="favorites.php" method="POST" class="hidden">
-                    <input type="hidden" name="action" value="add_fav">
-                    <input type="hidden" name="p_id" value="<?= $p_id ?>">
                 </form>
 
             </div>
@@ -389,61 +425,12 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
     </div>
 
     <div class="mt-10 mb-20 max-w-4xl mx-auto">
-        <div class="flex justify-center border-b border-gray-200 dark:border-gray-700 mb-8 pb-1 gap-2 sm:gap-6">
-            <button onclick="switchTab('detail')" id="tab-btn-detail" class="tab-btn tab-active px-6 py-2.5 rounded-full font-bold text-sm sm:text-base transition-all duration-300">
-                รายละเอียดสินค้า
-            </button>
-            <button onclick="switchTab('howto')" id="tab-btn-howto" class="tab-btn tab-inactive px-6 py-2.5 rounded-full font-bold text-sm sm:text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300">
-                วิธีใช้
-            </button>
-            <button onclick="switchTab('review')" id="tab-btn-review" class="tab-btn tab-inactive px-6 py-2.5 rounded-full font-bold text-sm sm:text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300">
-                รีวิว (128)
-            </button>
-        </div>
-
-        <div id="tab-content-detail" class="tab-content block animate-fade-in">
-            <div class="bg-white dark:bg-gray-800 rounded-3xl p-8 sm:p-12 shadow-sm border border-gray-100 dark:border-gray-700">
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">ส่วนผสมหลักจากธรรมชาติ</h3>
-                <div class="text-gray-600 dark:text-gray-300 leading-relaxed space-y-4 whitespace-pre-line text-lg">
-                    <?= htmlspecialchars($product['p_detail']) ?>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-content-howto" class="tab-content hidden animate-fade-in">
-            <div class="bg-white dark:bg-gray-800 rounded-3xl p-8 sm:p-12 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
-                <span class="material-icons-round text-6xl text-pink-200 mb-4 block">auto_awesome</span>
-                <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2">ขั้นตอนการใช้งาน</h3>
-                <p class="text-gray-500">1. ทำความสะอาดผิวหน้าให้สะอาด<br>2. ลูบไล้ผลิตภัณฑ์ให้ทั่วใบหน้าและลำคอ<br>3. ใช้เป็นประจำทุกเช้า-เย็น</p>
-            </div>
-        </div>
-
-        <div id="tab-content-review" class="tab-content hidden animate-fade-in">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div class="flex items-center gap-3 mb-4">
-                        <img src="https://ui-avatars.com/api/?name=น้องพลอย&background=fce7f3&color=F43F85" class="w-12 h-12 rounded-full">
-                        <div>
-                            <p class="font-bold text-gray-800 dark:text-white text-sm">น้องพลอย</p>
-                            <div class="flex text-yellow-400 text-[14px]">
-                                <span class="material-icons-round">star</span><span class="material-icons-round">star</span><span class="material-icons-round">star</span><span class="material-icons-round">star</span><span class="material-icons-round">star</span>
-                            </div>
-                        </div>
-                    </div>
-                    <p class="text-gray-600 dark:text-gray-300 text-sm">"ใช้ดีมากค่ะ กลิ่นหอมอ่อนๆ ไม่ฉุน ซึมไวไม่เหนียวเหนอะหนะ หน้าใสขึ้นจริงหลังจากใช้หมดไปหนึ่งขวด ชอบแพ็คเกจมากน่ารักสุดๆ"</p>
-                </div>
-                <div class="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <div class="flex items-center gap-3 mb-4">
-                        <img src="https://ui-avatars.com/api/?name=คุณแป้ง&background=e0e7ff&color=4f46e5" class="w-12 h-12 rounded-full">
-                        <div>
-                            <p class="font-bold text-gray-800 dark:text-white text-sm">คุณแป้ง</p>
-                            <div class="flex text-yellow-400 text-[14px]">
-                                <span class="material-icons-round">star</span><span class="material-icons-round">star</span><span class="material-icons-round">star</span><span class="material-icons-round">star</span><span class="material-icons-round text-gray-300">star</span>
-                            </div>
-                        </div>
-                    </div>
-                    <p class="text-gray-600 dark:text-gray-300 text-sm">"ส่งไวมาก แพ็คของมาดี มีของแถมด้วย ตัวเซรั่มเนื้อบางเบา ทาก่อนแต่งหน้าเครื่องสำอางติดทนขึ้น ผิวดูโกลว์ธรรมชาติ"</p>
-                </div>
+        <div class="bg-white dark:bg-gray-800 rounded-3xl p-8 sm:p-12 shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                <span class="material-icons-round text-primary">description</span> รายละเอียดสินค้า
+            </h3>
+            <div class="text-gray-600 dark:text-gray-300 leading-relaxed space-y-4 whitespace-pre-line text-lg">
+                <?= htmlspecialchars($product['p_detail'] ?: 'ไม่มีข้อมูลรายละเอียดสินค้า') ?>
             </div>
         </div>
     </div>
@@ -505,96 +492,222 @@ if ($stmtRec = mysqli_prepare($conn, $sqlRec)) {
         <p class="text-xs text-gray-400">© 2026 Lumina Beauty. All rights reserved.</p>
     </div>
 </footer>
-<style>
-    /* อนิเมชันเวลาเปลี่ยน Tab */
-    .animate-fade-in {
-        animation: fadeIn 0.3s ease-in-out forwards;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(5px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-</style>
+
+<div id="lightbox" class="fixed inset-0 z-[100] hidden bg-black/95 backdrop-blur-sm flex items-center justify-center opacity-0 transition-opacity duration-300">
+    <button onclick="closeLightbox()" class="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-50">
+        <span class="material-icons-round text-3xl">close</span>
+    </button>
+    
+    <?php if(count($images) > 1): ?>
+    <button onclick="changeLightboxImg(-1)" class="absolute left-4 sm:left-10 top-1/2 -translate-y-1/2 w-14 h-14 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-50">
+        <span class="material-icons-round text-4xl">chevron_left</span>
+    </button>
+    <button onclick="changeLightboxImg(1)" class="absolute right-4 sm:right-10 top-1/2 -translate-y-1/2 w-14 h-14 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-50">
+        <span class="material-icons-round text-4xl">chevron_right</span>
+    </button>
+    <?php endif; ?>
+    
+    <div class="relative overflow-hidden w-full max-w-5xl h-[85vh] flex items-center justify-center px-4">
+        <img id="lightbox-img" src="" class="max-w-full max-h-full object-contain transition-transform duration-300 select-none" style="transform: scale(1);">
+    </div>
+    
+    <div class="absolute bottom-8 flex gap-3 bg-white/10 px-6 py-3 rounded-full backdrop-blur-md">
+        <button onclick="zoomLightbox(-0.25)" class="text-white hover:text-primary transition-colors flex items-center justify-center w-10 h-10"><span class="material-icons-round text-3xl">zoom_out</span></button>
+        <button onclick="zoomLightbox(0)" class="text-white hover:text-primary transition-colors flex items-center justify-center w-10 h-10"><span class="material-icons-round text-3xl">search</span></button>
+        <button onclick="zoomLightbox(0.25)" class="text-white hover:text-primary transition-colors flex items-center justify-center w-10 h-10"><span class="material-icons-round text-3xl">zoom_in</span></button>
+    </div>
+</div>
 
 <script>
-    // สลับ Dark Mode
-    if (localStorage.getItem('theme') === 'dark') {
-        document.documentElement.classList.add('dark');
-    }
+    const productImages = <?= json_encode($images) ?>;
+    let currentImageIndex = 0;
+    const isLoggedIn = <?= $isLoggedIn ? 'true' : 'false' ?>;
+
+    if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
     function toggleTheme() {
-        const htmlEl = document.documentElement;
-        htmlEl.classList.toggle('dark');
+        const htmlEl = document.documentElement; htmlEl.classList.toggle('dark');
         localStorage.setItem('theme', htmlEl.classList.contains('dark') ? 'dark' : 'light');
     }
 
-    // ฟังก์ชันปรับจำนวนสินค้า (+/-)
+    // ฟังก์ชันเลื่อนรูปรองซ้ายขวา
+    function scrollThumbs(amount) {
+        const container = document.getElementById('thumb-container');
+        if (container) {
+            container.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    }
+
+    // ฟังก์ชันปรับจำนวน
     function adjustQty(amount) {
         const input = document.getElementById('qtyInput');
         const maxStock = parseInt(input.getAttribute('max')) || 99;
         let currentVal = parseInt(input.value) || 1;
         let newVal = currentVal + amount;
-        
-        if (newVal >= 1 && newVal <= maxStock) {
-            input.value = newVal;
-        }
+        if (newVal >= 1 && newVal <= maxStock) input.value = newVal;
     }
 
-    // ฟังก์ชันเปลี่ยนรูปหลักเมื่อกด Thumbnail
-    function changeMainImage(clickedBtn, imgSrc) {
+    // ฟังก์ชันเปลี่ยนรูปหลัก
+    function changeMainImage(clickedBtn, imgSrc, index) {
         document.getElementById('mainImage').src = imgSrc;
+        currentImageIndex = index;
         
         const btns = document.querySelectorAll('.thumbnail-btn');
         btns.forEach(btn => {
             btn.classList.remove('border-primary', 'shadow-md', 'opacity-100');
             btn.classList.add('border-transparent', 'opacity-60');
         });
-        
         clickedBtn.classList.remove('border-transparent', 'opacity-60');
         clickedBtn.classList.add('border-primary', 'shadow-md', 'opacity-100');
     }
 
-    // ฟังก์ชันเลือกระบุสี (Color Swatches)
+    // ฟังก์ชันเลือกสี
     function selectColor(btn, colorName) {
-        // 1. อัปเดต Input Hidden สำหรับส่งค่าไปตะกร้า
         document.getElementById('selectedColorInput').value = colorName;
-        // 2. อัปเดตข้อความแสดงสีที่เลือก
         document.getElementById('selectedColorNameText').textContent = colorName;
-
-        // 3. รีเซ็ตกรอบและซ่อนไอคอนติ๊กถูกของปุ่มสีทั้งหมด
         const swatches = document.querySelectorAll('.color-swatch');
         swatches.forEach(swatch => {
             swatch.classList.remove('ring-2', 'ring-primary', 'scale-110', 'shadow-md');
             swatch.classList.add('ring-1', 'ring-gray-200', 'dark:ring-gray-600', 'hover:scale-110');
             swatch.querySelector('.material-icons-round').classList.replace('block', 'hidden');
         });
-
-        // 4. เน้นปุ่มที่ถูกกด และแสดงไอคอนติ๊กถูก
         btn.classList.remove('ring-1', 'ring-gray-200', 'dark:ring-gray-600', 'hover:scale-110');
         btn.classList.add('ring-2', 'ring-primary', 'scale-110', 'shadow-md');
         btn.querySelector('.material-icons-round').classList.replace('hidden', 'block');
     }
 
-    // ฟังก์ชันสลับ Tab (รายละเอียด / วิธีใช้ / รีวิว)
-    function switchTab(tabId) {
-        // ซ่อนเนื้อหาทั้งหมด
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.add('hidden');
-            content.classList.remove('block');
-        });
-        
-        // รีเซ็ตปุ่มทั้งหมด
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('tab-active');
-            btn.classList.add('tab-inactive');
-        });
+    // 🟢 ระบบ Lightbox 🟢
+    let currentZoom = 1;
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lightbox-img');
 
-        // แสดงเนื้อหาที่เลือก
-        document.getElementById('tab-content-' + tabId).classList.remove('hidden');
-        document.getElementById('tab-content-' + tabId).classList.add('block');
+    function openLightbox() {
+        lbImg.src = productImages[currentImageIndex];
+        currentZoom = 1;
+        lbImg.style.transform = `scale(${currentZoom})`;
+        lb.classList.remove('hidden');
+        lb.classList.add('flex');
+        setTimeout(() => lb.classList.remove('opacity-0'), 10);
+    }
+
+    function closeLightbox() {
+        lb.classList.add('opacity-0');
+        setTimeout(() => { lb.classList.add('hidden'); lb.classList.remove('flex'); }, 300);
+    }
+
+    function changeLightboxImg(dir) {
+        currentImageIndex += dir;
+        if(currentImageIndex < 0) currentImageIndex = productImages.length - 1;
+        if(currentImageIndex >= productImages.length) currentImageIndex = 0;
         
-        // เน้นปุ่มที่เลือก
-        document.getElementById('tab-btn-' + tabId).classList.remove('tab-inactive');
-        document.getElementById('tab-btn-' + tabId).classList.add('tab-active');
+        lbImg.style.opacity = '0';
+        setTimeout(() => {
+            lbImg.src = productImages[currentImageIndex];
+            currentZoom = 1;
+            lbImg.style.transform = `scale(${currentZoom})`;
+            lbImg.style.opacity = '1';
+            
+            // Sync กับหน้าเว็บหลักด้วย
+            const thumbs = document.querySelectorAll('.thumbnail-btn');
+            if(thumbs.length > 0) changeMainImage(thumbs[currentImageIndex], productImages[currentImageIndex], currentImageIndex);
+        }, 200);
+    }
+
+    function zoomLightbox(factor) {
+        if(factor === 0) currentZoom = 1;
+        else currentZoom += factor;
+        
+        if(currentZoom < 0.5) currentZoom = 0.5;
+        if(currentZoom > 3) currentZoom = 3;
+        lbImg.style.transform = `scale(${currentZoom})`;
+    }
+
+    // 🟢 แอนิเมชันรูปลอยเข้าตะกร้า/หัวใจ (AJAX) 🟢
+    function flyToIcon(targetIconId) {
+        const sourceImg = document.getElementById('mainImage');
+        const targetIcon = document.getElementById(targetIconId);
+        
+        if (!sourceImg || !targetIcon) return;
+
+        const flyingImg = sourceImg.cloneNode();
+        const srcRect = sourceImg.getBoundingClientRect();
+        const targetRect = targetIcon.getBoundingClientRect();
+
+        flyingImg.classList.add('flying-img');
+        flyingImg.style.left = srcRect.left + 'px';
+        flyingImg.style.top = srcRect.top + 'px';
+        flyingImg.style.width = srcRect.width + 'px';
+        flyingImg.style.height = srcRect.height + 'px';
+        document.body.appendChild(flyingImg);
+
+        // คำนวณให้บินไปตรงกลางไอคอน
+        setTimeout(() => {
+            flyingImg.style.left = (targetRect.left + targetRect.width / 2 - 20) + 'px';
+            flyingImg.style.top = (targetRect.top + targetRect.height / 2 - 20) + 'px';
+            flyingImg.style.width = '40px';
+            flyingImg.style.height = '40px';
+            flyingImg.style.opacity = '0';
+        }, 10);
+
+        setTimeout(() => {
+            flyingImg.remove();
+            // เอฟเฟกต์เด้งที่ไอคอน
+            targetIcon.classList.add('scale-125', 'text-primary');
+            setTimeout(() => targetIcon.classList.remove('scale-125', 'text-primary'), 300);
+        }, 800);
+    }
+
+    function addToCartAjax(e) {
+        e.preventDefault();
+        if(!isLoggedIn) {
+            window.location.href = '../auth/login.php';
+            return;
+        }
+
+        const form = document.getElementById('productForm');
+        const formData = new FormData(form);
+        const qty = parseInt(document.getElementById('qtyInput').value);
+
+        fetch('cart.php', {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if(response.ok) {
+                // เล่นแอนิเมชัน
+                flyToIcon('nav-cart-icon');
+                
+                // อัปเดตตัวเลขในตะกร้า
+                setTimeout(() => {
+                    const badge = document.getElementById('cart-badge');
+                    let currentBadgeQty = parseInt(badge.innerText) || 0;
+                    badge.innerText = currentBadgeQty + qty;
+                }, 800);
+            }
+        });
+    }
+
+    function addToFavAjax() {
+        if(!isLoggedIn) {
+            window.location.href = '../auth/login.php';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('action', 'add_fav');
+        formData.append('p_id', '<?= $p_id ?>');
+
+        fetch('favorites.php', {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if(response.ok) {
+                flyToIcon('nav-fav-icon');
+                const heartIcon = document.querySelector('#nav-fav-icon span');
+                setTimeout(() => {
+                    heartIcon.innerText = 'favorite'; // เปลี่ยนเป็นหัวใจทึบ
+                    heartIcon.classList.add('text-primary');
+                }, 800);
+            }
+        });
     }
 </script>
 </body>
