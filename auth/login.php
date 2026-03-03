@@ -271,8 +271,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <nav class="absolute top-0 left-0 w-full z-50 p-6 md:px-10 lg:px-16">
     <a href="../home.php" class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity w-fit">
-        <span class="material-icons-round text-primary text-5xl">spa</span>
-        <span class="font-bold text-4xl tracking-tight text-primary">Lumina</span>
+        <span class="material-icons-round text-primary text-4xl">spa</span>
+        <span class="font-bold text-3xl tracking-tight text-primary">Lumina</span>
     </a>
 </nav>
 
