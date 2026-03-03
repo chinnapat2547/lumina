@@ -269,19 +269,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-[#1b0d14] dark:text-[#f3e7ed] antialiased min-h-screen flex flex-col">
 
-<nav class="sticky top-0 z-50 font-prompt">
-    <div class="w-full px-6 md:px-10 lg:px-16"> 
-        <div class="flex items-center h-20 w-full">
-            <a href="../home.php" class="flex-shrink-0 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                <span class="material-icons-round text-primary text-4xl">spa</span>
-                <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
-            </a>
-        </div>
+<div class="w-full px-6 md:px-10 lg:px-16"> 
+    <div class="flex items-center h-20 w-full">
+        <a href="../home.php" class="flex-shrink-0 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+            <span class="material-icons-round text-primary text-4xl">spa</span>
+            <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
+        </a>
     </div>
-</nav>
+</div>
+
 <div class="flex flex-1 w-full flex-row overflow-hidden">
     
 <div id="visual-container" class="hidden lg:flex w-1/2 relative bg-gradient-to-br from-[#ffecd2] via-[#fcb69f] to-[#e0c3fc] items-center justify-center overflow-hidden">
+    
+    <div class="parallax-item absolute top-20 left-20 text-white/40" data-speed="0.02">
+        <span class="material-symbols-outlined text-6xl">auto_awesome</span>
+    </div>
+    <div class="parallax-item absolute bottom-32 right-20 text-white/30" data-speed="0.03">
+        <span class="material-symbols-outlined text-5xl">favorite</span>
+    </div>
 
     <div class="relative w-[500px] h-[500px] flex items-center justify-center">
         <div class="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-110"></div>
