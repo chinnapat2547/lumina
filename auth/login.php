@@ -269,12 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display text-[#1b0d14] dark:text-[#f3e7ed] antialiased min-h-screen flex flex-col">
 
-    <div class="flex items-center h-20 w-full">
-        <a href="../home.php" class="flex-shrink-0 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-            <span class="material-icons-round text-primary text-4xl">spa</span>
-            <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
-        </a>
-    </div>
+
 
 <div class="flex flex-1 w-full flex-row overflow-hidden">
     
