@@ -282,16 +282,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="flex flex-1 w-full flex-row overflow-hidden">
     
 <div id="visual-container" class="hidden lg:flex w-1/2 relative bg-gradient-to-br from-[#ffecd2] via-[#fcb69f] to-[#e0c3fc] items-center justify-center overflow-hidden">
-    
-    <div class="parallax-item absolute top-20 left-20 text-white/40" data-speed="0.02">
-        <span class="material-symbols-outlined text-6xl">auto_awesome</span>
-    </div>
-    <div class="parallax-item absolute bottom-32 right-20 text-white/30" data-speed="0.03">
-        <span class="material-symbols-outlined text-5xl">favorite</span>
-    </div>
 
     <div class="relative w-[500px] h-[500px] flex items-center justify-center">
-        
+        <div class="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-110"></div>
         
         <div class="parallax-item absolute z-20" data-speed="0.05">
             <div class="w-64 h-48 bg-gradient-to-b from-white to-[#ffeef6] rounded-[60px] cloud-body relative flex items-center justify-center">
