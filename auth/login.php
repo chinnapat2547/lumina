@@ -291,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <div class="relative w-[500px] h-[500px] flex items-center justify-center">
-        <div class="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-110"></div>
+        
         
         <div class="parallax-item absolute z-20" data-speed="0.05">
             <div class="w-64 h-48 bg-gradient-to-b from-white to-[#ffeef6] rounded-[60px] cloud-body relative flex items-center justify-center">
