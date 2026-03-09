@@ -396,13 +396,14 @@ $catStyles = [
         <span class="material-icons-round text-2xl">chevron_left</span>
     </button>
     
-    <div id="featuredSlider" class="flex gap-6 overflow-x-auto no-scrollbar snap-x scroll-smooth pb-6 px-2">
+    <?php $col_count = count($featured_products) > 0 ? min(10, count($featured_products)) : 1; ?>
+    <div id="featuredSlider" class="grid gap-6 overflow-x-auto no-scrollbar snap-x scroll-smooth pb-6 px-2" style="grid-template-columns: repeat(<?= $col_count ?>, 260px);">
         <?php foreach($featured_products as $p): 
             $p_img = (!empty($p['p_image']) && file_exists("uploads/products/" . $p['p_image'])) 
                         ? "uploads/products/" . $p['p_image'] 
                         : "https://via.placeholder.com/400x400.png?text=No+Image";
         ?>
-        <a href="shop/productdetail.php?id=<?= $p['p_id'] ?>" class="snap-start flex-shrink-0 bg-white dark:bg-surface-dark rounded-[24px] p-4 shadow-soft hover:shadow-glow transition-all duration-300 group border border-transparent dark:border-gray-700 flex flex-col h-full w-[260px]">
+        <a href="shop/productdetail.php?id=<?= $p['p_id'] ?>" class="snap-start bg-white dark:bg-surface-dark rounded-[24px] p-4 shadow-soft hover:shadow-glow transition-all duration-300 group border border-transparent dark:border-gray-700 flex flex-col h-full w-full">
             <div class="w-full aspect-square bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden mb-4 relative flex items-center justify-center">
                 <img alt="<?= htmlspecialchars($p['p_name']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="<?= $p_img ?>"/>
                 <?php if($p['p_stock'] <= 0): ?>
@@ -424,7 +425,9 @@ $catStyles = [
         <?php endforeach; ?>
         
         <?php if(empty($featured_products)): ?>
-            <p class="text-center text-gray-500 py-10 w-full text-lg">ยังไม่มีสินค้าแนะนำในขณะนี้</p>
+            <div class="col-span-full w-full flex justify-center">
+                <p class="text-center text-gray-500 py-10 text-lg">ยังไม่มีสินค้าแนะนำในขณะนี้</p>
+            </div>
         <?php endif; ?>
     </div>
 
