@@ -321,7 +321,9 @@ if ($isLoggedIn) {
     <nav class="flex items-center justify-start mb-10 text-sm text-gray-500 dark:text-gray-400">
         <a class="hover:text-primary transition-colors" href="../home.php">หน้าหลัก</a>
         <span class="mx-2 material-icons-round text-[16px]">chevron_right</span>
-        <a class="hover:text-primary transition-colors" href="products.php">สกินแคร์</a>
+        <a class="hover:text-primary transition-colors" href="category.php?id=<?= $product['c_id'] ?? 0 ?>">
+            <?= htmlspecialchars($product['p_category'] ?? 'สินค้าทั่วไป') ?>
+        </a>
         <span class="mx-2 material-icons-round text-[16px]">chevron_right</span>
         <span class="text-primary font-bold truncate max-w-[200px]"><?= htmlspecialchars($product['p_name']) ?></span>
     </nav>
