@@ -211,123 +211,120 @@ while($c = mysqli_fetch_assoc($resCat)) { $categories_list[] = $c; }
     <div class="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] rounded-full bg-purple-200 dark:bg-purple-900 blur-[100px] opacity-30 animate-pulse" style="animation-delay: 2s;"></div>
 </div>
 
-<header class="sticky top-0 z-50 glass-panel shadow-sm px-6 py-4 mb-8 relative">
+<nav class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-pink-100 dark:border-gray-800 font-display">
     <div class="w-full px-4 md:px-10 lg:px-16"> 
-        <div class="flex justify-between items-center h-10 w-full">
-        <a href="../home.php" class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
-            <span class="material-icons-round text-primary text-4xl">spa</span>
-            <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
-        </a>
-
-        <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-20">
-            <a href="products.php" class="flex flex-col items-center justify-center cursor-pointer">
-                <span class="text-[18px] font-bold text-primary leading-tight">สินค้า</span>
-                <span class="text-[13px] text-primary/80">(Shop)</span>
+        <div class="flex justify-between items-center h-20 w-full">
+            <a href="../home.php" class="flex-shrink-0 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                <span class="material-icons-round text-primary text-4xl">spa</span>
+                <span class="font-bold text-2xl tracking-tight text-primary">Lumina</span>
             </a>
-            <div class="relative group">
-                <button class="flex flex-col items-center justify-center transition pb-2 pt-2">
-                    <div class="flex items-center gap-1">
-                        <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">หมวดหมู่</span>
-                        <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
-                    </div>
-                    <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary">(Categories)</span>
-                </button>
-                <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
-                        <?php foreach($categories_list as $c): ?>
-                            <a href="?category[]=<?= $c['c_id'] ?>" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition"><?= htmlspecialchars($c['c_name']) ?></a>
-                        <?php endforeach; ?>
+
+            <div class="hidden lg:flex gap-8 xl:gap-12 items-center justify-center flex-grow ml-20">
+                <a class="group flex flex-col items-center justify-center transition" href="products.php">
+                    <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">สินค้า</span>
+                    <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Shop)</span>
+                </a>
+                
+                <div class="relative group">
+                    <button class="flex flex-col items-center justify-center transition pb-2 pt-2">
+                        <div class="flex items-center gap-1">
+                            <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">หมวดหมู่</span>
+                            <span class="material-icons-round text-sm text-gray-700 dark:text-gray-200 group-hover:text-primary">expand_more</span>
+                        </div>
+                        <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Categories)</span>
+                    </button>
+                    <div class="absolute left-1/2 -translate-x-1/2 hidden pt-1 w-48 z-50 group-hover:block">
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden py-2">
+                            <?php foreach($categories_list as $c): ?>
+                                <a href="category.php?id=<?= $c['c_id'] ?>" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-pink-50 dark:hover:bg-gray-700 hover:text-primary transition">
+                                    <?= htmlspecialchars($c['c_name']) ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <a class="group flex flex-col items-center justify-center transition" href="../auth/contact.php">
-                <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary leading-tight">ติดต่อเรา</span>
-                <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary">(Contact)</span>
-            </a>
-        </div>
-
-        <div class="flex items-center space-x-3 sm:space-x-5">
-            <div class="hidden xl:block relative group">
-                <form action="products.php" method="GET" class="relative">
-                    <input id="liveSearchInput" name="search" value="<?= htmlspecialchars($search_query) ?>" onkeyup="liveSearch(this.value)" class="pl-10 pr-4 py-2 rounded-full border border-pink-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary text-sm w-48 xl:w-56 transition-all relative z-10" placeholder="ค้นหาสินค้า..." type="text" autocomplete="off"/>
-                    <span class="material-icons-round absolute left-3 top-2 text-gray-400 z-10 pointer-events-none">search</span>
-        
-                    <div id="searchResultBox" class="absolute top-[110%] left-0 w-[150%] bg-white dark:bg-gray-800 shadow-2xl rounded-2xl overflow-hidden hidden z-[100] border border-gray-100 dark:border-gray-700 max-h-[400px] overflow-y-auto">
-                    </div>
-                </form>
-            </div>
-            
-            <a href="favorites.php" id="nav-fav-icon" class="text-gray-500 dark:text-gray-300 hover:text-pink-600 transition relative flex items-center justify-center group">
-                <span class="material-icons-round text-2xl transition-transform duration-300 group-hover:scale-110">favorite_border</span>
-            </a>
-            
-            <a href="cart.php" id="nav-cart-icon" class="relative w-10 h-10 flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-pink-50 dark:hover:bg-gray-800 rounded-full transition-all cursor-pointer">
-                <span class="material-icons-round text-2xl transition-transform duration-300">shopping_bag</span>
-                <span id="cart-badge" class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800 transition-transform duration-300">
-                    <?= $totalCartItems ?>
-                </span>
-            </a>
-            
-            <button class="hover:text-primary transition flex items-center justify-center" onclick="toggleTheme()">
-                <span class="material-icons-round dark:hidden text-2xl text-gray-500">dark_mode</span>
-                <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
-            </button>
-
-            <div class="relative group flex items-center">
-                <a href="<?= $isAdmin ? '../admin/dashboard.php' : ($isLoggedIn ? '../profile/account.php' : '../auth/login.php') ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
-                    <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
-                        <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
-                    </div>
+                <a class="group flex flex-col items-center justify-center transition" href="../auth/contact.php">
+                    <span class="text-[18px] font-bold text-gray-700 dark:text-gray-200 group-hover:text-primary dark:group-hover:text-primary leading-tight">ติดต่อเรา</span>
+                    <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-primary dark:group-hover:text-primary">(Contact)</span>
                 </a>
-                <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
-                    <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
-                        <div class="text-center mb-4">
-                            <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
-                                <?= $isAdmin ? 'Administrator Mode' : ($isLoggedIn ? htmlspecialchars($userData['u_email']) : 'กรุณาเข้าสู่ระบบ') ?>
-                            </span>
+            </div>
+
+            <div class="flex items-center space-x-3 sm:space-x-5 text-gray-600 dark:text-gray-300">
+                <a href="favorites.php" class="hover:text-primary transition relative flex items-center">
+                    <span class="material-icons-round text-2xl">favorite_border</span>
+                </a>
+                <a href="cart.php" class="hover:text-primary transition relative flex items-center">
+                    <span class="material-icons-round text-2xl text-primary">shopping_bag</span>
+                    <span class="absolute -top-1.5 -right-2 bg-primary text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center border-2 border-white dark:border-gray-800">
+                        <?= $totalCartItems ?>
+                    </span>
+                </a>
+                
+                <button class="hover:text-primary transition flex items-center justify-center" onclick="toggleTheme()">
+                    <span class="material-icons-round dark:hidden text-2xl text-gray-500">dark_mode</span>
+                    <span class="material-icons-round hidden dark:block text-yellow-400 text-2xl">light_mode</span>
+                </button>
+
+                <div class="relative group flex items-center">
+                    <a href="<?= $isAdmin ? '../admin/dashboard.php' : ($isLoggedIn ? '../profile/account.php' : '../auth/login.php') ?>" class="block w-10 h-10 rounded-full bg-gradient-to-tr <?= $isAdmin ? 'from-purple-400 to-indigo-400' : 'from-pink-300 to-purple-300' ?> p-0.5 shadow-sm hover:shadow-md hover:scale-105 transition-all cursor-pointer">
+                        <div class="bg-white dark:bg-gray-800 rounded-full p-[2px] w-full h-full">
+                            <img alt="Profile" class="w-full h-full rounded-full object-cover" src="<?= htmlspecialchars($profileImage) ?>"/>
                         </div>
-                        <div class="flex justify-center relative mb-4">
-                            <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
-                                <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
-                                    <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                    </a>
+                    
+                    <div class="absolute right-0 hidden pt-4 top-full w-[320px] z-50 group-hover:block cursor-default">
+                        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-[0_10px_40px_-10px_rgba(236,45,136,0.2)] border border-pink-100 dark:border-gray-700 overflow-hidden p-5 relative">
+                            
+                            <div class="text-center mb-4">
+                                <span class="text-sm font-medium <?= $isAdmin ? 'text-purple-500 font-bold' : 'text-gray-500 dark:text-gray-400' ?>">
+                                    <?= $isLoggedIn ? htmlspecialchars($userData['u_email']) : 'กรุณาเข้าสู่ระบบเพื่อใช้งาน' ?>
+                                </span>
+                            </div>
+
+                            <div class="flex justify-center relative mb-4">
+                                <div class="rounded-full p-[3px] <?= $isAdmin ? 'bg-purple-500' : 'bg-primary' ?> shadow-md">
+                                    <div class="bg-white dark:bg-gray-800 rounded-full p-[3px] w-16 h-16">
+                                        <img src="<?= htmlspecialchars($profileImage) ?>" alt="Profile" class="w-full h-full rounded-full object-cover">
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="text-center mt-2 mb-6">
-                            <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username']) ?></h3>
-                        </div>
-                        <div class="flex flex-col gap-3 mt-2">
-                            <?php if($isAdmin): ?>
-                                <a href="admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
-                                    <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+
+                            <div class="text-center mt-2 mb-6">
+                                <h3 class="text-[22px] font-bold text-gray-800 dark:text-white">สวัสดี คุณ <?= htmlspecialchars($userData['u_username']) ?></h3>
+                            </div>
+
+                            <div class="flex flex-col gap-3 mt-2">
+                                <?php if($isAdmin): ?>
+                                    <a href="../admin/dashboard.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-purple-500 hover:bg-purple-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-purple-500">
+                                        <span class="material-icons-round text-[20px]">admin_panel_settings</span> สำหรับ Admin
+                                    </a>
+                                <?php elseif($isLoggedIn): ?>
+                                    <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                        จัดการบัญชี
+                                    </a>
+                                <?php else: ?>
+                                    <a href="../auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                        <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
+                                    </a>
+                                    <a href="../auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
+                                        <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <?php if($isLoggedIn): ?>
+                                <a href="../auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
+                                    <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
                                 </a>
-                            <?php elseif($isLoggedIn): ?>
-                                <a href="../profile/account.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    จัดการบัญชี
-                                </a>
-                            <?php else: ?>
-                                <a href="auth/login.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">login</span> เข้าสู่ระบบ
-                                </a>
-                                <a href="auth/register.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-primary hover:bg-primary hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-primary">
-                                    <span class="material-icons-round text-[20px]">person_add</span> สมัครสมาชิก
-                                </a>
-                            <?php endif; ?>
-                            
-                            <?php if($isLoggedIn): ?>
-                            <a href="auth/logout.php" class="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border-2 border-red-500 hover:bg-red-500 hover:text-white rounded-full py-2.5 transition text-[15px] font-semibold text-red-500">
-                                <span class="material-icons-round text-[20px]">logout</span> ออกจากระบบ
-                            </a>
-                            <?php endif; ?>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        </div>
     </div>
-</header>
+</nav>
 
 <main class="relative z-10 w-full min-h-[calc(100vh-80px)] pb-20">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
