@@ -110,6 +110,18 @@ if ($isLoggedIn && !$isAdmin) {
         }
     }
 
+    // ==========================================
+    // ดึงข้อมูลหมวดหมู่มาแสดงที่ Navbar
+    // ==========================================
+    $categories_list = [];
+    $sqlCat = "SELECT * FROM category ORDER BY c_id ASC";
+    $resCat = mysqli_query($conn, $sqlCat);
+    if($resCat) {
+        while($c = mysqli_fetch_assoc($resCat)) {
+            $categories_list[] = $c;
+        }
+    }
+
     // ----------------------------------------------------
     // 📌 2. ดึงข้อมูลสินค้าในตะกร้าของผู้ใช้งาน (รวมสีด้วย)
     // ----------------------------------------------------
@@ -138,18 +150,8 @@ if ($isLoggedIn && !$isAdmin) {
 }
 $netTotal = $totalPrice + $shippingFee; // ยอดสุทธิ
 
-// ==========================================
-// ดึงข้อมูลหมวดหมู่มาแสดงที่ Navbar
-// ==========================================
-$categories_list = [];
-$sqlCat = "SELECT * FROM category ORDER BY c_id ASC";
-$resCat = mysqli_query($conn, $sqlCat);
-if($resCat) {
-    while($c = mysqli_fetch_assoc($resCat)) {
-        $categories_list[] = $c;
-    }
-}
 ?>
+
 <!DOCTYPE html>
 <html lang="th"><head>
 <meta charset="utf-8"/>
